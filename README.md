@@ -39,9 +39,11 @@ If you discover a security vulnerability within this package, please open an iss
 ## Credits
 
 - [All Contributors](../../contributors)
+- [galperins4](https://github.com/galperins4)
 - [Georgi Stoyanov](https://github.com/geopsllc)
 
 ## License
 
-[MIT](LICENSE) © [geopsllc](https://github.com/geopsllc)
+- [MIT](LICENSE) © [galperins4](https://github.com/galperins4)
+- [MIT](LICENSE) © [geopsllc](https://github.com/geopsllc)
 
