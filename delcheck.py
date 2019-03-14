@@ -20,12 +20,19 @@ async def notifications(msg):
             Message=msg)
 
 async def api_get(url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            return await resp.json()
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=20) as resp:
+                return await resp.json()
+    except asyncio.TimeoutError:
+        return 'timeout'
+    except:
+        return 'error'
 
 async def v2(network,delegate):
     result = await api_get(nodes[network] + '/delegates/' + delegate)
+    if result == 'error' or result == 'timeout':
+        return
     rank = str(result['data']['rank'])
     if result['data']['rank'] <= db[network][0]:
         active = 'yes'
@@ -54,6 +61,8 @@ async def v2(network,delegate):
 
 async def v1(network,delegate):
     result = await api_get(nodes[network] + '/delegates/get?username=' + delegate)
+    if result == 'error' or result == 'timeout':
+        return
     rank = str(result['delegate']['rate'])
     if result['delegate']['rate'] <= db[network][0]:
         active = 'yes'
