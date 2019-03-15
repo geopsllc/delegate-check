@@ -36,10 +36,8 @@ async def v2(network,delegate):
     rank = str(result['data']['rank'])
     if result['data']['rank'] <= db[network][0]:
         active = 'yes'
-        activehtml = "<span class=\"badge badge-pill badge-success\">yes</span>"
     else:
         active = 'no'
-        activehtml = "<span class=\"badge badge-pill badge-danger\">no</span>"
     rank = rank + '/' + str(db[network][0])
     timestamp = result['data']['blocks']['last']['timestamp']['unix']
     utc_remote = datetime.utcfromtimestamp(timestamp)
@@ -49,15 +47,13 @@ async def v2(network,delegate):
     tworounds = 2 * db[network][0] * db[network][1]
     if delta > tworounds:
         miss = 'yes'
-        misshtml = "<span class=\"badge badge-pill badge-danger\">yes</span>"
         if sns_enabled == 'yes' and delta < 2 * tworounds:
             await notifications(network + ' delegate missed a block!')
             print('Sent SMS!')
     else:
         miss = 'no'
-        misshtml = "<span class=\"badge badge-pill badge-success\">no</span>"
     print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Active: ' + active + ' | Last Block: ' + lb + ' min ago | Missed Block: ' + miss)
-    csv.write(network + ',' + delegate + ',' + rank + ',' + activehtml + ',' + lb + ' min ago,' + misshtml + '\n')
+    csv.write(network + ',' + delegate + ',' + rank + ',' + active + ',' + lb + ' min ago,' + miss + '\n')
 
 async def v1(network,delegate):
     result = await api_get(nodes[network] + '/delegates/get?username=' + delegate)
@@ -66,10 +62,8 @@ async def v1(network,delegate):
     rank = str(result['delegate']['rate'])
     if result['delegate']['rate'] <= db[network][0]:
         active = 'yes'
-        activehtml = "<span class=\"badge badge-pill badge-success\">yes</span>"
     else:
         active = 'no'
-        activehtml = "<span class=\"badge badge-pill badge-danger\">no</span>"
     rank = rank + '/' + str(db[network][0])
     pubkey = str(result['delegate']['publicKey'])
     result = await api_get(nodes[network] + '/blocks?generatorPublicKey=' + pubkey + '&limit=1')
@@ -81,15 +75,13 @@ async def v1(network,delegate):
     tworounds = 2 * db[network][0] * db[network][1]
     if delta > tworounds:
         miss = 'yes'
-        misshtml = "<span class=\"badge badge-pill badge-danger\">yes</span>"
         if sns_enabled == 'yes' and delta < 2 * tworounds:
             await notifications(network + ' delegate missed a block!')
             print('Sent SMS!')
     else:
         miss = 'no'
-        misshtml = "<span class=\"badge badge-pill badge-success\">no</span>"
     print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Active: ' + active + ' | Last Block: ' + lb + ' min ago | Missed Block: ' + miss)
-    csv.write(network + ',' + delegate + ',' + rank + ',' + activehtml + ',' + lb + ' min ago,' + misshtml + '\n')
+    csv.write(network + ',' + delegate + ',' + rank + ',' + active + ',' + lb + ' min ago,' + miss + '\n')
 
 # Build Tasks List
 tasks = []

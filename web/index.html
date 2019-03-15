@@ -46,7 +46,13 @@
                 if ( i == 0 ) {
                     row.append($('<th>'+cellData+'</th>'));
                 } else {
-                    row.append($('<td>'+cellData+'</td>'));
+                    if ( (j == 3 && cellData == "yes") || (j == 5 && cellData == "no") ) {
+                        row.append($('<td><span class="badge badge-pill badge-success">'+cellData+'</span></td>'));
+                    } else if ( j == 3 || j == 5 ) {
+                        row.append($('<td><span class="badge badge-pill badge-danger">'+cellData+'</span></td>'));
+                    } else {
+                        row.append($('<td>'+cellData+'</td>'));
+                    }
                 }
             });
             if ( i == 0 ) {
