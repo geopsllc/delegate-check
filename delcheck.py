@@ -52,7 +52,7 @@ async def v2(network,delegate):
             print('Sent SMS!')
     else:
         miss = 'no'
-    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Active: ' + active + ' | Last Block: ' + lb + ' min ago | Missed Block: ' + miss)
+    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + active + ' | Last Block: ' + lb + ' min ago | Block Miss: ' + miss)
     csv.write(network + ',' + delegate + ',' + rank + ',' + active + ',' + lb + ' min ago,' + miss + '\n')
 
 async def v1(network,delegate):
@@ -80,7 +80,7 @@ async def v1(network,delegate):
             print('Sent SMS!')
     else:
         miss = 'no'
-    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Active: ' + active + ' | Last Block: ' + lb + ' min ago | Missed Block: ' + miss)
+    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + active + ' | Last Block: ' + lb + ' min ago | Block Miss: ' + miss)
     csv.write(network + ',' + delegate + ',' + rank + ',' + active + ',' + lb + ' min ago,' + miss + '\n')
 
 # Build Tasks List
@@ -95,7 +95,7 @@ for network in delegates:
 
 # Initiate CSV
 csv = open('state.csv','w+')
-csv.write("Network,Delegate,Rank,Active,Last Block,Missed Block\n")
+csv.write("Network,Delegate,Rank,Forging,Last Block,Block Miss\n")
 
 # Async Loop
 loop = asyncio.get_event_loop()
