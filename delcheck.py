@@ -48,7 +48,7 @@ async def v2(network,delegate):
     if delta > tworounds:
         state = 'missing'
         if sns_enabled == 'yes' and delta < 90 + tworounds:
-            await notifications(network + ' delegate missed a block!')
+            await notifications(network + ' delegate ' + delegate + '  missed a block!')
             print('Sent SMS!')
     else:
         state = 'healthy'
@@ -76,7 +76,7 @@ async def v1(network,delegate):
     if delta > tworounds:
         state = 'missing'
         if sns_enabled == 'yes' and delta < 90 + tworounds:
-            await notifications(network + ' delegate missed a block!')
+            await notifications(network + ' delegate ' + delegate + ' missed a block!')
             print('Sent SMS!')
     else:
         state = 'healthy'
