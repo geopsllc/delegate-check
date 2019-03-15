@@ -35,9 +35,9 @@ async def v2(network,delegate):
         return
     rank = str(result['data']['rank'])
     if result['data']['rank'] <= db[network][0]:
-        active = 'yes'
+        forging = 'yes'
     else:
-        active = 'no'
+        forging = 'no'
     rank = rank + '/' + str(db[network][0])
     timestamp = result['data']['blocks']['last']['timestamp']['unix']
     utc_remote = datetime.utcfromtimestamp(timestamp)
@@ -46,14 +46,14 @@ async def v2(network,delegate):
     lb = str(int(round(delta/60)))
     tworounds = 2 * db[network][0] * db[network][1]
     if delta > tworounds:
-        miss = 'yes'
+        state = 'missing'
         if sns_enabled == 'yes' and delta < 90 + tworounds:
             await notifications(network + ' delegate missed a block!')
             print('Sent SMS!')
     else:
-        miss = 'no'
-    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + active + ' | Last Block: ' + lb + ' min ago | Block Miss: ' + miss)
-    csv.write(network + ',' + delegate + ',' + rank + ',' + active + ',' + lb + ' min ago,' + miss + '\n')
+        state = 'healthy'
+    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + forging + ' | Last Block: ' + lb + ' min ago | State: ' + state)
+    csv.write(network + ',' + delegate + ',' + rank + ',' + forging + ',' + lb + ' min ago,' + state + '\n')
 
 async def v1(network,delegate):
     result = await api_get(nodes[network] + '/delegates/get?username=' + delegate)
@@ -61,9 +61,9 @@ async def v1(network,delegate):
         return
     rank = str(result['delegate']['rate'])
     if result['delegate']['rate'] <= db[network][0]:
-        active = 'yes'
+        forging = 'yes'
     else:
-        active = 'no'
+        forging = 'no'
     rank = rank + '/' + str(db[network][0])
     pubkey = str(result['delegate']['publicKey'])
     result = await api_get(nodes[network] + '/blocks?generatorPublicKey=' + pubkey + '&limit=1')
@@ -74,14 +74,14 @@ async def v1(network,delegate):
     lb = str(int(round(delta/60)))
     tworounds = 2 * db[network][0] * db[network][1]
     if delta > tworounds:
-        miss = 'yes'
+        state = 'missing'
         if sns_enabled == 'yes' and delta < 90 + tworounds:
             await notifications(network + ' delegate missed a block!')
             print('Sent SMS!')
     else:
-        miss = 'no'
-    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + active + ' | Last Block: ' + lb + ' min ago | Block Miss: ' + miss)
-    csv.write(network + ',' + delegate + ',' + rank + ',' + active + ',' + lb + ' min ago,' + miss + '\n')
+        state = 'healthy'
+    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + forging + ' | Last Block: ' + lb + ' min ago | State: ' + state)
+    csv.write(network + ',' + delegate + ',' + rank + ',' + forging + ',' + lb + ' min ago,' + state + '\n')
 
 # Build Tasks List
 tasks = []
@@ -95,7 +95,7 @@ for network in delegates:
 
 # Initiate CSV
 csv = open('state.csv','w+')
-csv.write("Network,Delegate,Rank,Forging,Last Block,Block Miss\n")
+csv.write("Network,Delegate,Rank,Forging,Last Block,State\n")
 
 # Async Loop
 loop = asyncio.get_event_loop()
