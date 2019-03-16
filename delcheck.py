@@ -45,7 +45,9 @@ async def v2(network,delegate):
     delta = int((utc_local - utc_remote).total_seconds())
     lb = str(int(round(delta/60)))
     tworounds = 2 * db[network][0] * db[network][1]
-    if delta > tworounds:
+    if forging == 'no':
+        state = 'out'
+    elif delta > tworounds:
         state = 'missing'
         if sns_enabled == 'yes' and delta < 90 + tworounds:
             await notifications(network + ' delegate ' + delegate + '  missed a block!')
@@ -73,7 +75,9 @@ async def v1(network,delegate):
     delta = int((utc_local - utc_remote).total_seconds())
     lb = str(int(round(delta/60)))
     tworounds = 2 * db[network][0] * db[network][1]
-    if delta > tworounds:
+    if forging == 'no':
+        state = 'out'
+    elif delta > tworounds:
         state = 'missing'
         if sns_enabled == 'yes' and delta < 90 + tworounds:
             await notifications(network + ' delegate ' + delegate + ' missed a block!')
