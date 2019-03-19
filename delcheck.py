@@ -38,7 +38,6 @@ async def v2(network,delegate):
         forging = 'yes'
     else:
         forging = 'no'
-    rank = rank + '/' + str(db[network][0])
     timestamp = result['data']['blocks']['last']['timestamp']['unix']
     utc_remote = datetime.utcfromtimestamp(timestamp)
     utc_local = datetime.utcnow().replace(microsecond=0)
@@ -66,7 +65,6 @@ async def v1(network,delegate):
         forging = 'yes'
     else:
         forging = 'no'
-    rank = rank + '/' + str(db[network][0])
     pubkey = str(result['delegate']['publicKey'])
     result = await api_get(nodes[network] + '/blocks?generatorPublicKey=' + pubkey + '&limit=1')
     timestamp = result['blocks'][0]['timestamp']
