@@ -29,32 +29,70 @@ async def api_get(url):
     except:
         return 'error'
 
+def get_round(height,network):
+    data = divmod(height,db[network][0])
+    if data[1] == 0:
+        result = data[0]
+    else:
+        result = data[0] + 1
+    return result
+
 async def v2(network,delegate):
+
     result = await api_get(nodes[network] + '/delegates/' + delegate)
     if result == 'error' or result == 'timeout':
         return
+
+    blocks = await api_get(nodes[network] + '/delegates/' + delegate + '/blocks')
+    if blocks == 'error' or blocks == 'timeout':
+        return
+
+    height = await api_get(nodes[network] + '/node/status')
+    if height == 'error' or height == 'timeout':
+        return
+
     rank = str(result['data']['rank'])
+
     if result['data']['rank'] <= db[network][0]:
         forging = 'yes'
     else:
         forging = 'no'
+
     timestamp = result['data']['blocks']['last']['timestamp']['unix']
     utc_remote = datetime.utcfromtimestamp(timestamp)
     utc_local = datetime.utcnow().replace(microsecond=0)
     delta = int((utc_local - utc_remote).total_seconds())
-    lb = str(int(round(delta/60)))
+    lb_delta = str(int(round(delta/60)))
     tworounds = 2 * db[network][0] * db[network][1]
+    net_round = get_round(height['data']['now'],network)
+    cur_round = get_round(blocks['data'][0]['height'],network)
+    prev_round = get_round(blocks['data'][1]['height'],network)
+
     if forging == 'no':
         state = 'out'
-    elif delta > tworounds:
+    elif net_round <= cur_round + 1 and prev_round >= cur_round - 1:
+        state = 'healthy'
+    else:
         state = 'missing'
         if sns_enabled == 'yes' and delta < 90 + tworounds:
             await notifications(network + ' delegate ' + delegate + '  missed a block!')
-            print('Sent SMS!')
-    else:
-        state = 'healthy'
-    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + forging + ' | Last Block: ' + lb + ' min ago | State: ' + state)
-    csv.write(network + ',' + delegate + ',' + rank + ',' + forging + ',' + lb + ' min ago,' + state + '\n')
+
+    missed = 0
+    total_extra = 0
+    total = blocks['meta']['count']
+    if net_round > cur_round + 1:
+        missed += net_round - cur_round - 1
+        total_extra += missed
+    for i in range(0,total - 2):
+        cur_round = get_round(blocks['data'][i]['height'],network)
+        prev_round = get_round(blocks['data'][i + 1]['height'],network)
+        if prev_round < cur_round - 1:
+            missed += 1
+    total += total_extra
+    prod = str(round((total - missed)/total*100))
+
+    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + forging + ' | Last Block: ' + lb_delta + ' min ago | State: ' + state + ' | Yield: ' + prod + '%')
+    csv.write(network + ',' + delegate + ',' + rank + ',' + forging + ',' + lb_delta + ' min ago,' + state + '\n')
 
 async def v1(network,delegate):
     result = await api_get(nodes[network] + '/delegates/get?username=' + delegate)
@@ -71,7 +109,7 @@ async def v1(network,delegate):
     utc_remote = datetime(epoch[network][0], epoch[network][1], epoch[network][2], epoch[network][3], epoch[network][4], epoch[network][5]) + timedelta(seconds=timestamp)
     utc_local = datetime.utcnow().replace(microsecond=0)
     delta = int((utc_local - utc_remote).total_seconds())
-    lb = str(int(round(delta/60)))
+    lb_delta = str(int(round(delta/60)))
     tworounds = 2 * db[network][0] * db[network][1]
     if forging == 'no':
         state = 'out'
@@ -82,8 +120,8 @@ async def v1(network,delegate):
             print('Sent SMS!')
     else:
         state = 'healthy'
-    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + forging + ' | Last Block: ' + lb + ' min ago | State: ' + state)
-    csv.write(network + ',' + delegate + ',' + rank + ',' + forging + ',' + lb + ' min ago,' + state + '\n')
+    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + forging + ' | Last Block: ' + lb_delta + ' min ago | State: ' + state)
+    csv.write(network + ',' + delegate + ',' + rank + ',' + forging + ',' + lb_delta + ' min ago,' + state + '\n')
 
 # Build Tasks List
 tasks = []
