@@ -24,7 +24,7 @@ This is a DPoS Monitoring Tool for Multiple Delegates Across Multiple Networks.
 - The backend is async coded so most api calls are made almost simultaneously.
 - You can use it in cli mode or bring up a web interface that refreshes every minute. 
 - You can enable AWS SNS intergration to send a SMS meesage when a delegate misses a block.
-- [Sample Website](http://dashboard.geops.net)
+- [Sample Website](http://test.geops.net)
 
 ## Changelog
 
