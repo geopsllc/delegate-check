@@ -39,60 +39,56 @@ def get_round(height,network):
 
 async def v2(network,delegate):
 
-    result = await api_get(nodes[network] + '/delegates/' + delegate)
-    if result == 'error' or result == 'timeout':
+    del_info = await api_get(nodes[network] + '/delegates/' + delegate)
+    if del_info == 'error' or del_info == 'timeout':
         return
 
-    blocks = await api_get(nodes[network] + '/delegates/' + delegate + '/blocks')
-    if blocks == 'error' or blocks == 'timeout':
+    del_blocks = await api_get(nodes[network] + '/delegates/' + delegate + '/blocks')
+    if del_blocks == 'error' or del_blocks == 'timeout':
         return
 
-    height = await api_get(nodes[network] + '/node/status')
-    if height == 'error' or height == 'timeout':
+    net_height = await api_get(nodes[network] + '/node/status')
+    if net_height == 'error' or net_height == 'timeout':
         return
 
-    rank = str(result['data']['rank'])
-
-    if result['data']['rank'] <= db[network][0]:
+    if del_info['data']['rank'] <= db[network][0]:
         forging = 'yes'
     else:
         forging = 'no'
 
-    timestamp = result['data']['blocks']['last']['timestamp']['unix']
+    rank = str(del_info['data']['rank'])
+    timestamp = del_info['data']['blocks']['last']['timestamp']['unix']
     utc_remote = datetime.utcfromtimestamp(timestamp)
     utc_local = datetime.utcnow().replace(microsecond=0)
-    delta = int((utc_local - utc_remote).total_seconds())
-    lb_delta = str(int(round(delta/60)))
-    tworounds = 2 * db[network][0] * db[network][1]
-    net_round = get_round(height['data']['now'],network)
-    cur_round = get_round(blocks['data'][0]['height'],network)
-    prev_round = get_round(blocks['data'][1]['height'],network)
+    delta = str(round(int((utc_local - utc_remote).total_seconds())/60))
+    net_round = get_round(net_height['data']['now'],network)
+    cur_round = get_round(del_blocks['data'][0]['height'],network)
 
     if forging == 'no':
         state = 'out'
-    elif net_round <= cur_round + 1 and prev_round >= cur_round - 1:
+    elif net_round <= cur_round + 1:
         state = 'healthy'
     else:
         state = 'missing'
-        if sns_enabled == 'yes' and delta < 90 + tworounds:
+        if sns_enabled == 'yes' and net_round == cur_round + 2:
             await notifications(network + ' delegate ' + delegate + '  missed a block!')
 
     missed = 0
-    total_extra = 0
-    total = blocks['meta']['count']
+    forged = del_blocks['meta']['count']
+
     if net_round > cur_round + 1:
         missed += net_round - cur_round - 1
-        total_extra += missed
-    for i in range(0,total - 2):
-        cur_round = get_round(blocks['data'][i]['height'],network)
-        prev_round = get_round(blocks['data'][i + 1]['height'],network)
-        if prev_round < cur_round - 1:
-            missed += 1
-    total += total_extra
-    prod = str(round((total - missed)/total*100))
 
-    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + forging + ' | Last Block: ' + lb_delta + ' min ago | State: ' + state + ' | Yield: ' + prod + '%')
-    csv.write(network + ',' + delegate + ',' + rank + ',' + forging + ',' + lb_delta + ' min ago,' + state + '\n')
+    for i in range(0,forged - 2):
+        cur_round = get_round(del_blocks['data'][i]['height'],network)
+        prev_round = get_round(del_blocks['data'][i + 1]['height'],network)
+        if prev_round < cur_round - 1:
+            missed += cur_round - prev_round - 1
+
+    prod = str(round(forged*100/(forged + missed)))
+
+    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + forging + ' | Last Block: ' + delta + ' min ago | State: ' + state + ' | Yield: ' + prod + '%')
+    csv.write(network + ',' + delegate + ',' + rank + ',' + forging + ',' + delta + ' min ago,' + state + '\n')
 
 async def v1(network,delegate):
     result = await api_get(nodes[network] + '/delegates/get?username=' + delegate)
