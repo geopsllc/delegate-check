@@ -4,7 +4,7 @@
 
 Basic install:
 ```sh
-git clone https://github.com/geopsllc/delegate-check
+git clone https://github.com/geopsllc/delegate-check -b v2
 cd delegate-check
 bash install.sh
 nano config.py
@@ -27,6 +27,11 @@ This is a DPoS Monitoring Tool for Multiple Delegates Across Multiple Networks.
 - [Sample Website](http://dashboard.geops.net)
 
 ## Changelog
+
+### 0.2
+
+- added productivity column
+- only works for Core v2 networks
 
 ### 0.1
 
