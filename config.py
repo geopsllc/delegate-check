@@ -24,7 +24,7 @@ nodes = {
     'Phantom':'https://explorer.phantom.org:8443/api/v2'
 }
 
-# Network Settings [delegates, blocktime, core version]
+# Network Settings [delegates, blocktime]
 db = {
     'Ark':[51, 8],
     'DArk':[51, 8],
