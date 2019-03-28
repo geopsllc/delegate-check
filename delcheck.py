@@ -16,9 +16,7 @@ async def notifications(msg):
         aws_access_key_id=aws_key_id,
         aws_secret_access_key=aws_secret_key,
         region_name=aws_region) as client:
-        await client.publish(
-            PhoneNumber=phone,
-            Message=msg)
+        await client.publish(PhoneNumber=phone,Message=msg)
 
 async def api_get(url):
 
@@ -58,11 +56,18 @@ async def del_check(network,delegate):
     if net_height == 'error' or net_height == 'timeout':
         return
 
+    total_rounds = del_blocks['meta']['count']
+
+    if total_rounds < 2:
+        return
+
     if del_info['data']['rank'] <= db[network][0]:
         forging = 'yes'
     else:
         forging = 'no'
 
+    missed = 0
+    forged = 0
     rank = str(del_info['data']['rank'])
     timestamp = del_info['data']['blocks']['last']['timestamp']['unix']
     utc_remote = datetime.utcfromtimestamp(timestamp)
@@ -80,19 +85,20 @@ async def del_check(network,delegate):
         if sns_enabled == 'yes' and net_round == cur_round + 2:
             await notifications(network + ' delegate ' + delegate + '  missed a block!')
 
-    missed = 0
-    forged = del_blocks['meta']['count']
-
     if net_round > cur_round + 1:
         missed += net_round - cur_round - 1
+    forged += 1
 
-    for i in range(0,forged - 2):
+    for i in range(0,total_rounds - 2):
         cur_round = get_round(del_blocks['data'][i]['height'],network)
         prev_round = get_round(del_blocks['data'][i + 1]['height'],network)
         if prev_round < cur_round - 1:
             missed += cur_round - prev_round - 1
+        forged += 1
+        if total_rounds <= forged + missed:
+            break
 
-    prod = str(round(forged*100/(forged + missed)))
+    prod = str(round((forged * 100)/(forged + missed)))
 
     print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + forging + ' | Last Block: ' + delta + ' min ago | State: ' + state + ' | Yield: ' + prod + '%')
     csv.write(network + ',' + delegate + ',' + rank + ',' + forging + ',' + delta + ' min ago,' + state + ',' + prod + '%\n')
