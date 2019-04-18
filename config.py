@@ -12,7 +12,8 @@ delegates = {
     'DArk':['name'],
     'Qredit':['name'],
     'Phantom':['name'],
-    'Ripa':['name1','name2']
+    'Ripa':['name1','name2'],
+    'Kapu':['name1','name2']
 }
 
 # Don't change the rest unless you know what you're doing!
@@ -23,7 +24,8 @@ nodes = {
     'DArk':'https://dexplorer.ark.io/api/v2',
     'Qredit':'https://qredit.cloud/api/v2',
     'Phantom':'https://explorer.phantom.org:8443/api/v2',
-    'Ripa':'https://api.ripaex.io/api/v2'
+    'Ripa':'https://api.ripaex.io/api/v2',
+    'Kapu':'https://api.kapunode.net/api/v2'
 }
 
 # Network Settings [delegates, blocktime]
@@ -32,5 +34,6 @@ db = {
     'DArk':[51, 8],
     'Qredit':[51, 8],
     'Phantom':[51, 8],
-    'Ripa':[101, 8]
+    'Ripa':[101, 8],
+    'Kapu':[51, 8]
 }
