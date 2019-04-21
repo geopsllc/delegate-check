@@ -2,6 +2,8 @@
 
 # Imports
 from config import *
+import os
+import json
 import asyncio
 import aiohttp
 import aioboto3
@@ -12,7 +14,7 @@ from shutil import copy2
 # Functions
 async def notifications(msg):
 
-    async with aioboto3.client("sns",
+    async with aioboto3.client('sns',
         aws_access_key_id=aws_key_id,
         aws_secret_access_key=aws_secret_key,
         region_name=aws_region) as client:
@@ -78,12 +80,17 @@ async def del_check(network,delegate):
 
     if forging == 'no':
         state = 'out'
+        if sns_enabled == 'yes' and savedState[network][delegate] == 'clean':
+            await notifications(network + ' delegate ' + delegate + '  not forging!')
+            savedState[network][delegate] == 'dirty'
     elif net_round <= cur_round + 1:
         state = 'healthy'
+        savedState[network][delegate] == 'clean'
     else:
         state = 'missing'
-        if sns_enabled == 'yes' and net_round == cur_round + 2:
+        if sns_enabled == 'yes' and savedState[network][delegate] == 'clean':
             await notifications(network + ' delegate ' + delegate + '  missed a block!')
+            savedState[network][delegate] == 'dirty'
 
     if net_round > cur_round + 1:
         missed += net_round - cur_round - 1
@@ -103,16 +110,27 @@ async def del_check(network,delegate):
     print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + forging + ' | Last Block: ' + delta + ' min ago | State: ' + state + ' | Yield: ' + prod + '%')
     csv.write(network + ',' + delegate + ',' + rank + ',' + forging + ',' + delta + ' min ago,' + state + ',' + prod + '%\n')
 
-# Build Tasks List
+# Initialize Lists
 tasks = []
+savedState = {}
 
-for network in delegates:
-    for delegate in delegates[network]:
-        tasks.append(asyncio.ensure_future(del_check(network,delegate)))
-
-# Initiate CSV
+# Initialize CSV
 csv = open('state.csv','w+')
-csv.write("Network,Delegate,Rank,Forging,Last Block,State,Yield\n")
+csv.write('Network,Delegate,Rank,Forging,Last Block,State,Yield\n')
+
+# Load JSON state file
+if os.path.exists('state.json'):
+    with open('state.json', 'r') as file:
+      savedState = json.load(file)
+
+# Fill in the Lists
+for network in delegates:
+    if network not in savedState:
+        savedState[network] = {}
+    for delegate in delegates[network]:
+        if delegate not in savedState[network]:
+            savedState[network][delegate] = 'clean'
+        tasks.append(asyncio.ensure_future(del_check(network,delegate)))
 
 # Async Loop
 loop = asyncio.get_event_loop()
@@ -123,6 +141,9 @@ try:
 finally:
     loop.close()
 
-# Close and Copy CSV to web/
+# Cleanup
 csv.close()
 copy2('state.csv','web/')
+
+with open('state.json', 'w+') as file:
+  json.dump(savedState, file)
