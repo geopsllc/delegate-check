@@ -82,15 +82,15 @@ async def del_check(network,delegate):
         state = 'out'
         if sns_enabled == 'yes' and savedState[network][delegate] == 'clean':
             await notifications(network + ' delegate ' + delegate + '  not forging!')
-            savedState[network][delegate] == 'dirty'
+            savedState[network][delegate] = 'dirty'
     elif net_round <= cur_round + 1:
         state = 'healthy'
-        savedState[network][delegate] == 'clean'
+        savedState[network][delegate] = 'clean'
     else:
         state = 'missing'
         if sns_enabled == 'yes' and savedState[network][delegate] == 'clean':
             await notifications(network + ' delegate ' + delegate + '  missed a block!')
-            savedState[network][delegate] == 'dirty'
+            savedState[network][delegate] = 'dirty'
 
     if net_round > cur_round + 1:
         missed += net_round - cur_round - 1
