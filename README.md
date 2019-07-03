@@ -1,4 +1,4 @@
-# DPoS Monitoring Tool for Delegates Across Multiple Networks
+# DPoS Monitoring Tool for Delegates Across Multiple Chains
 
 ## Installation
 
