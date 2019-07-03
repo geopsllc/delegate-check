@@ -3,6 +3,7 @@
 ## Installation
 
 Basic install:
+
 ```sh
 git clone https://github.com/geopsllc/delegate-check
 cd delegate-check
