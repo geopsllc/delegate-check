@@ -4,7 +4,7 @@
 
 Basic install:
 ```sh
-git clone https://github.com/geopsllc/delegate-check -b v2
+git clone https://github.com/geopsllc/delegate-check
 cd delegate-check
 bash install.sh
 nano config.py
@@ -20,18 +20,18 @@ Frontend setup:
 ## General
 
 This is a DPoS Monitoring Tool for Multiple Delegates Across Multiple Networks.
+- Supports Core v2 only.
 - Requires Python 3.6.7 or above - native on Ubuntu 18.04.
 - The backend is async coded so most api calls are made almost simultaneously.
 - You can use it in cli mode or bring up a web interface that refreshes every minute. 
 - You can enable AWS SNS intergration to send a SMS meesage when a delegate misses a block.
-- [Sample Website](http://dashboard2.geops.net)
+- [Sample Website](http://dashboard.geops.net)
 
 ## Changelog
 
 ### 0.2
 
 - added productivity column
-- only works for Core v2 networks
 
 ### 0.1
 
