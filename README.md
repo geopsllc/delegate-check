@@ -28,6 +28,9 @@ This is a DPoS Monitoring Tool for Multiple Delegates Across Multiple Networks.
 - [Sample Website](http://dashboard.geops.net)
 
 ## Changelog
+### 1.0
+
+- official release
 
 ### 0.2
 
