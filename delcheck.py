@@ -102,8 +102,6 @@ async def del_check(network,delegate):
         if prev_round < cur_round - 1:
             missed += cur_round - prev_round - 1
         forged += 1
-        if total_rounds <= forged + missed:
-            break
 
     prod = str(round((forged * 100)/(forged + missed)))
 
