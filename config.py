@@ -11,8 +11,9 @@ delegates = {
     'Ark':['name'],
     'DArk':['name'],
     'Qredit':['name'],
-    'Persona':['name'],
-    'Phantom':['name'],
+    'Blockpool':['name1','name2'],
+    'Persona':['name1','name2'],
+    'Phantom':['name1','name2'],
     'Ripa':['name1','name2'],
     'Kapu':['name1','name2']
 }
@@ -21,9 +22,10 @@ delegates = {
 
 # Network APIs
 nodes = {
-    'Ark':'https://explorer.ark.io/api/v2',
-    'DArk':'https://dexplorer.ark.io/api/v2',
-    'Qredit':'https://qredit.cloud/api/v2',
+    'Ark':'https://explorer.ark.io/api',
+    'DArk':'https://dexplorer.ark.io/api',
+    'Qredit':'https://qredit.cloud/api',
+    'Blockpool':'http://api.mainnet.blockpool.io:9031/api'
     'Persona':'https://explorer.persona.im:8443/api/v2',
     'Phantom':'https://explorer.phantom.org:8443/api/v2',
     'Ripa':'https://api.ripaex.io/api/v2',
@@ -35,6 +37,7 @@ db = {
     'Ark':[51, 8],
     'DArk':[51, 8],
     'Qredit':[51, 8],
+    'Blockpool':[201, 15],
     'Persona':[51, 8],
     'Phantom':[51, 8],
     'Ripa':[101, 8],
