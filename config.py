@@ -25,7 +25,7 @@ nodes = {
     'Ark':'https://explorer.ark.io/api',
     'DArk':'https://dexplorer.ark.io/api',
     'Qredit':'https://qredit.cloud/api',
-    'Blockpool':'http://api.mainnet.blockpool.io:9031/api'
+    'Blockpool':'http://api.mainnet.blockpool.io:9031/api',
     'Persona':'https://explorer.persona.im:8443/api/v2',
     'Phantom':'https://explorer.phantom.org:8443/api/v2',
     'Ripa':'https://api.ripaex.io/api/v2',
