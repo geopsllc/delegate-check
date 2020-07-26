@@ -20,7 +20,7 @@ Frontend setup:
 ## General
 
 This is a DPoS Monitoring Tool for Multiple Delegates Across Multiple Networks.
-- Supports Core v2 only.
+- Supports Core v2+.
 - Requires Python 3.6.7 or above - native on Ubuntu 18.04.
 - The backend is async coded so most api calls are made almost simultaneously.
 - You can use it in cli mode or bring up a web interface that refreshes every minute. 
