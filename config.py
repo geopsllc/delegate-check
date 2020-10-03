@@ -30,7 +30,7 @@ nodes = {
     'Blockpool':'http://api.mainnet.blockpool.io:9031/api',
     'Phantom':'https://explorer.phantom.org:8443/api/v2',
     'Ripa':'https://api.ripaex.io/api/v2',
-    'Kapu':'https://api.kapunode.net/api/v2'
+    'Kapu':'https://api.kapunode.net/api/v2',
     'Hydra':'http://35.195.150.223:4703/api/v2',
     'Compendia-M':'https://api.compendia.org/api',
     'Compendia-D':'https://api.nos.dev/api'
