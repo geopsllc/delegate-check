@@ -7,6 +7,7 @@ import json
 import asyncio
 import aiohttp
 import aioboto3
+import pandas
 from datetime import datetime
 from datetime import timedelta
 from shutil import copy2
@@ -145,8 +146,17 @@ try:
 finally:
     loop.close()
 
-# Cleanup
+# Sort & Cleanup
 csv.close()
+
+csvData = pandas.read_csv("state.csv")
+
+csvData.sort_values(["Network", "Delegate"],
+                    axis=0,
+                    inplace=True)
+
+csvData.to_csv('state.csv', index=False)
+
 copy2('state.csv','web/')
 
 with open('state.json', 'w+') as file:
