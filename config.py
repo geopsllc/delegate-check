@@ -10,7 +10,7 @@ phone = '+xxxxxxxxxxx'
 delegates = {
     'Ark':['name'],
     'DArk':['name'],
-    'DSolar':['name1','name2']
+    'TSolar':['name1','name2']
 }
 
 # Don't change the rest unless you know what you're doing!
@@ -19,12 +19,12 @@ delegates = {
 nodes = {
     'Ark':'https://api.ark.io/api',
     'DArk':'https://dapi.ark.io/api',
-    'DSolar':'http://dapi.solar.network/api'
+    'TSolar':'http://dapi.solar.network/api'
 }
 
 # Network Settings [delegates, blocktime]
 db = {
     'Ark':[51, 8],
     'DArk':[51, 8],
-    'DSolar':[53, 8]
+    'TSolar':[53, 8]
 }
