@@ -72,7 +72,7 @@ async def del_check(network,delegate):
     missed = 0
     forged = 0
     rank = str(del_info['data']['rank'])
-    timestamp = del_info['data']['blocks']['last']['timestamp']['unix']
+    timestamp = del_blocks['data'][0]['timestamp']['unix']
     utc_remote = datetime.utcfromtimestamp(timestamp)
     utc_local = datetime.utcnow().replace(microsecond=0)
     delta = str(round(int((utc_local - utc_remote).total_seconds())/60))
