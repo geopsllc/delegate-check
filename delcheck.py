@@ -105,13 +105,16 @@ async def del_check(network,delegate):
             cur_round = get_round(del_blocks['data'][i]['height'],network)
             prev_round = get_round(del_blocks['data'][i + 1]['height'],network)
             if prev_round < cur_round - 1:
-                if cur_round - prev_round - 1 > total_rounds - missed - forged:
-                    missed += total_rounds - missed - forged
+                if cur_round - prev_round - 1 >= total_rounds - missed - forged:
+                    missed = total_rounds - forged
                     break
                 else:
                     missed += cur_round - prev_round - 1
             else:
                 forged += 1
+                if forged >= total_rounds - missed:
+                    forged = total_rounds - missed
+                    break
 
     prod = str(round((forged * 100)/(forged + missed)))
 
