@@ -1,84 +1,191 @@
 <!DOCTYPE html>
-
-<html>
-
+<html lang="en">
 <head>
-
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=0.67, maximum-scale=3.0, minimum-scale=0.67">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate max-age=0" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="-1" />
-  <meta http-equiv="refresh" content="60" />
-
-  <title>Delegates</title>
-  
-  <link rel="stylesheet" href="bootstrap.min.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/4.6.3/papaparse.js"></script>
-  <style> .table{margin: auto; width: 75%;} </style>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delegates</title>
+<style>
+:root{
+  --bg:#1c1c1e; --surface:#262628; --ink:#e8e8ea; --muted:#9a9a9f; --line:#38383b;
+  --ok:#52d6a0; --ok-bg:#1f3a30; --bad:#ff8f80; --bad-bg:#412522;
+  --accent:#8ab4f8; --flash:#4a4216;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1200px;margin:0 auto;padding:28px 20px 48px}
+header{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;margin-bottom:24px}
+h1{margin:0;font-size:28px;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:14px}
+.live{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--muted)}
+.live.ok .dot{background:var(--ok);animation:pulse 2s infinite}
+.live.err .dot{background:var(--bad)}
+@keyframes pulse{50%{box-shadow:0 0 0 5px transparent;opacity:.6}}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{padding:11px 16px;text-align:left;white-space:nowrap}
+th{font-weight:600;font-size:13px;color:var(--muted);border-bottom:1px solid var(--line);cursor:pointer;user-select:none;position:sticky;top:0;background:var(--surface)}
+th[aria-sort=ascending]::after{content:" ▲";font-size:10px}
+th[aria-sort=descending]::after{content:" ▼";font-size:10px}
+td{border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:rgba(255,255,255,.04)}
+td.flash{animation:flash 2.4s ease-out}
+@keyframes flash{from{background:var(--flash)}}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600}
+.badge.ok{background:var(--ok-bg);color:var(--ok)}
+.badge.bad{background:var(--bad-bg);color:var(--bad)}
+.msg{padding:28px 20px;text-align:center;color:var(--muted)}
+.msg.error{color:var(--bad)}
+footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
+@media (max-width:640px){
+  main{padding:20px 12px 36px}
+  h1{font-size:24px}
+  .wrap{background:none;border:0;border-radius:0;overflow:visible}
+  table,tbody,tr,td{display:block;width:100%;min-width:0}
+  thead{display:none}
+  tr{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;padding:6px 0}
+  td{display:flex;justify-content:space-between;align-items:center;gap:16px;border:0;padding:6px 14px;white-space:normal;text-align:right}
+  td::before{content:attr(data-label);color:var(--muted);font-size:13px;text-align:left}
+  td:first-child{font-weight:600;font-size:16px;padding-bottom:8px;margin-bottom:2px;border-bottom:1px solid var(--line)}
+  td:first-child::before{display:none}
+  tbody tr:hover{background:var(--surface)}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
 </head>
-
 <body>
+<main>
+  <header>
+    <h1>Delegate Dashboard</h1>
+    <div class="sub" id="count"></div>
+    <div class="live" id="live" role="status" aria-live="polite"><span class="dot"></span><span id="liveText">Loading…</span></div>
+  </header>
 
-<div class="container" id="main">
-
-<br>
-<h1><center><p class="text-info">Delegate Dashboard</p></center></h1>
-
-</div>
+  <div class="wrap" id="wrap"><div class="msg">Loading state.csv…</div></div>
+  <footer>*Yield: productivity calculated over the last 100 rounds.</footer>
+</main>
 
 <script>
+const CSV_URL = 'state.csv';     // path to your CSV, relative to this page
+const REFRESH_MS = 30000;        // refresh every 30 seconds
+const $ = id => document.getElementById(id);
 
-    function arrayToTable(tableData) {
-        var table = $('<table class="table table-striped table-hover table-bordered" id="table"></table>');
-        var thead = $('<thead></thead>');
-        var tbody = $('<tbody></tbody>');
-        $(tableData).each(function (i, rowData) {
-            if ( i == 0 ) {
-                var row = $('<tr class="header"></tr>');
-            } else {
-                var row = $('<tr></tr>');
-            }
-            $(rowData).each(function (j, cellData) {
-                if ( i == 0 ) {
-                    row.append($('<th>'+cellData+'</th>'));
-                } else {
-                    if ( (j == 3 && cellData == "yes") || (j == 5 && cellData == "healthy") ) {
-                        row.append($('<td><span class="badge badge-pill badge-success">'+cellData+'</span></td>'));
-                    } else if ( j == 3 || j == 5 ) {
-                        row.append($('<td><span class="badge badge-pill badge-danger">'+cellData+'</span></td>'));
-                    } else {
-                        row.append($('<td>'+cellData+'</td>'));
-                    }
-                }
-            });
-            if ( i == 0 ) {
-                thead.append(row);
-            } else {
-                tbody.append(row);
-            }
-            table.append(thead);
-            table.append(tbody);
-        });
-        return table;
+let header = [], rows = [], prev = new Map();
+let sortCol = -1, sortDir = 1;
+let lastOk = null, inflight = false;
+
+/* Small RFC 4180 CSV parser (quotes, escaped quotes, CRLF) */
+function parseCSV(text){
+  const out = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (q){
+      if (c === '"'){ if (text[i+1] === '"'){ cell += '"'; i++; } else q = false; }
+      else cell += c;
+    } else if (c === '"') q = true;
+    else if (c === ','){ row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r'){
+      if (c === '\r' && text[i+1] === '\n') i++;
+      row.push(cell); cell = '';
+      if (row.some(v => v.trim() !== '')) out.push(row);
+      row = [];
+    } else cell += c;
+  }
+  row.push(cell);
+  if (row.some(v => v.trim() !== '')) out.push(row);
+  return out;
+}
+
+const GOOD = new Set(['yes','healthy','true','ok','online','active','synced','up']);
+const BAD  = new Set(['no','unhealthy','false','offline','down','missing','error','stopped','failed']);
+function kind(v){
+  const s = v.trim().toLowerCase();
+  return GOOD.has(s) ? 'ok' : BAD.has(s) ? 'bad' : '';
+}
+
+async function load(){
+  if (inflight) return;
+  inflight = true;
+  try{
+    const res = await fetch(CSV_URL + '?t=' + Date.now(), {cache:'no-store'});
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = parseCSV(await res.text());
+    if (!data.length) throw new Error('The file is empty');
+    header = data[0]; rows = data.slice(1);
+    lastOk = new Date();
+    setLive('ok');
+    render();
+  } catch (e){
+    setLive('err', e.message);
+    if (!rows.length){
+      $('wrap').innerHTML = '';
+      const m = document.createElement('div');
+      m.className = 'msg error';
+      m.textContent = 'Could not load ' + CSV_URL + ' (' + e.message + '). Serve this page from a web server next to the CSV; browsers block file:// reads.';
+      $('wrap').append(m);
     }
+  } finally { inflight = false; }
+}
 
-    $.ajax({
-        type: "GET",
-        url: "state.csv",
-        cache: false,
-        success: function (data) {
-            var div = document.getElementById("main");
-            $('div').append(arrayToTable(Papa.parse(data, {skipEmptyLines: true}).data));
-            $('div').append("<center>*Yield: Productivity calculated over the last 100 rounds.</center>");
-        }
+function setLive(state, err){
+  $('live').className = 'live ' + state;
+  $('liveText').textContent = state === 'ok'
+    ? 'Updated ' + lastOk.toLocaleTimeString()
+    : 'Update failed: ' + err + (lastOk ? ' · last good ' + lastOk.toLocaleTimeString() : '');
+}
+
+function render(){
+  let view = rows.slice();
+  if (sortCol >= 0){
+    view.sort((a,b) => {
+      const x = a[sortCol] ?? '', y = b[sortCol] ?? '';
+      const nx = parseFloat(x), ny = parseFloat(y);
+      const cmp = (!isNaN(nx) && !isNaN(ny)) ? nx - ny : x.localeCompare(y, undefined, {numeric:true});
+      return cmp * sortDir;
     });
+  }
+  $('count').textContent = rows.length + ' delegate' + (rows.length === 1 ? '' : 's');
 
+  const table = document.createElement('table');
+  const trh = table.createTHead().insertRow();
+  header.forEach((h, j) => {
+    const th = document.createElement('th');
+    th.textContent = h; th.tabIndex = 0;
+    th.setAttribute('aria-sort', j === sortCol ? (sortDir > 0 ? 'ascending' : 'descending') : 'none');
+    const go = () => { sortDir = (sortCol === j) ? -sortDir : 1; sortCol = j; render(); };
+    th.onclick = go;
+    th.onkeydown = e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); go(); } };
+    trh.append(th);
+  });
+
+  const tb = table.createTBody();
+  view.forEach(r => {
+    const tr = tb.insertRow();
+    header.forEach((_, j) => {
+      const v = r[j] ?? '', td = tr.insertCell(), k = kind(v);
+      td.dataset.label = header[j];
+      if (k){
+        const b = document.createElement('span');
+        b.className = 'badge ' + k; b.textContent = v; td.append(b);
+      } else td.textContent = v;
+      const id = r[0] + '|' + j;
+      if (prev.size && prev.has(id) && prev.get(id) !== v) td.classList.add('flash');
+    });
+  });
+  prev = new Map();
+  rows.forEach(r => header.forEach((_, j) => prev.set(r[0] + '|' + j, r[j] ?? '')));
+
+  $('wrap').innerHTML = '';
+  if (view.length) $('wrap').append(table);
+  else { const m = document.createElement('div'); m.className = 'msg'; m.textContent = 'No delegates found in ' + CSV_URL + '.'; $('wrap').append(m); }
+}
+
+setInterval(load, REFRESH_MS);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+load();
 </script>
-
 </body>
-
 </html>
