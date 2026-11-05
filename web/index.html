@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Delegates</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23262628'/%3E%3Cpolyline points='8,34 20,34 26,18 36,48 42,30 48,34 56,34' fill='none' stroke='%2352d6a0' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 :root{
   --bg:#1c1c1e; --surface:#262628; --ink:#e8e8ea; --muted:#9a9a9f; --line:#38383b;
@@ -43,6 +44,7 @@ footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
 @media (max-width:640px){
   main{padding:20px 12px 36px}
   h1{font-size:24px}
+  .price{flex:1 1 40%}
   .wrap{background:none;border:0;border-radius:0;overflow:visible}
   table,tbody,tr,td{display:block;width:100%;min-width:0}
   thead{display:none}
@@ -53,6 +55,14 @@ footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
   td:first-child::before{display:none}
   tbody tr:hover{background:var(--surface)}
 }
+.prices{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:20px}
+.prices:empty{display:none}
+.price{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 14px;text-align:center;min-width:120px}
+.price .n{color:var(--muted);font-size:12px}
+.price .v{font-weight:600;font-variant-numeric:tabular-nums}
+.price .c{font-size:12px;font-variant-numeric:tabular-nums}
+.price .c.up{color:var(--ok)}
+.price .c.down{color:var(--bad)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 </head>
@@ -64,13 +74,18 @@ footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
     <div class="live" id="live" role="status" aria-live="polite"><span class="dot"></span><span id="liveText">Loading…</span></div>
   </header>
 
+  <div class="prices" id="prices" aria-label="Prices in USD"></div>
+
   <div class="wrap" id="wrap"><div class="msg">Loading state.csv…</div></div>
-  <footer>*Yield: productivity calculated over the last 100 rounds.</footer>
+  <footer>*Yield: productivity calculated over the last 100 rounds.<br>Prices by <a href="https://www.coingecko.com" style="color:inherit">CoinGecko</a></footer>
 </main>
 
 <script>
 const CSV_URL = 'state.csv';     // path to your CSV, relative to this page
 const REFRESH_MS = 30000;        // refresh every 30 seconds
+const PRICE_REFRESH_MS = 300000; // refresh prices every 5 minutes
+const CG_API_KEY = '';           // optional free CoinGecko Demo key
+let priceIds = [], prices = {}, lastPriceFetch = 0, priceTimer = null;
 const $ = id => document.getElementById(id);
 
 let header = [], rows = [], prev = new Map();
@@ -118,6 +133,7 @@ async function load(){
     lastOk = new Date();
     setLive('ok');
     render();
+    if (!priceTimer){ priceTimer = setInterval(loadPrices, PRICE_REFRESH_MS); loadPrices(); }
   } catch (e){
     setLive('err', e.message);
     if (!rows.length){
@@ -183,8 +199,53 @@ function render(){
   else { const m = document.createElement('div'); m.className = 'msg'; m.textContent = 'No delegates found in ' + CSV_URL + '.'; $('wrap').append(m); }
 }
 
+/* Prices: BTC plus every distinct value in the Network column, lowercased, as CoinGecko IDs */
+async function loadPrices(){
+  let col = header.findIndex(h => h.trim().toLowerCase() === 'network');
+  if (col < 0) col = 0;
+  const ids = new Set(['bitcoin']);
+  rows.forEach(r => {
+    const id = (r[col] || '').trim().toLowerCase().replace(/\s+/g, '-');
+    if (id) ids.add(id);
+  });
+  priceIds = [...ids];
+  try{
+    const url = 'https://api.coingecko.com/api/v3/simple/price?vs_currencies=usd&include_24hr_change=true&ids=' +
+      encodeURIComponent(priceIds.join(','));
+    const res = await fetch(url, CG_API_KEY ? {headers:{'x-cg-demo-api-key':CG_API_KEY}} : undefined);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    prices = await res.json();
+    lastPriceFetch = Date.now();
+  } catch (e){ /* keep showing the last prices, if any */ }
+  renderPrices();
+}
+
+function renderPrices(){
+  const box = $('prices'); box.innerHTML = '';
+  const fmt = n => new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', maximumFractionDigits: n < 1 ? 6 : 2}).format(n);
+  priceIds.forEach(id => {
+    const p = prices[id];
+    if (!p || typeof p.usd !== 'number') return;   // not listed on CoinGecko: skip
+    const card = document.createElement('div'); card.className = 'price';
+    const n = document.createElement('div'); n.className = 'n'; n.textContent = id.charAt(0).toUpperCase() + id.slice(1);
+    const v = document.createElement('div'); v.className = 'v'; v.textContent = fmt(p.usd);
+    card.append(n, v);
+    if (typeof p.usd_24h_change === 'number'){
+      const c = document.createElement('div');
+      c.className = 'c ' + (p.usd_24h_change >= 0 ? 'up' : 'down');
+      c.textContent = (p.usd_24h_change >= 0 ? '▲ ' : '▼ ') + Math.abs(p.usd_24h_change).toFixed(2) + '%';
+      card.append(c);
+    }
+    box.append(card);
+  });
+}
+
 setInterval(load, REFRESH_MS);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  load();
+  if (priceTimer && Date.now() - lastPriceFetch > PRICE_REFRESH_MS) loadPrices();
+});
 load();
 </script>
 </body>
