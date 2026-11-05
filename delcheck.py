@@ -15,10 +15,12 @@ from shutil import copy2
 # Functions
 async def notifications(msg):
 
-    async with aioboto3.client('sns',
+    session = aioboto3.Session(
         aws_access_key_id=aws_key_id,
         aws_secret_access_key=aws_secret_key,
-        region_name=aws_region) as client:
+        region_name=aws_region)
+
+    async with session.client('sns') as client:
         await client.publish(PhoneNumber=phone,Message=msg)
 
 async def api_get(url):
