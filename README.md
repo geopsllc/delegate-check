@@ -21,12 +21,18 @@ Frontend setup:
 
 This is a DPoS Monitoring Tool for Multiple Delegates Across Multiple Networks.
 - Supports Core v2+.
-- Requires Python 3.6.7 or above - native on Ubuntu 18.04.
+- Requires Python 3.7 or above - native on Ubuntu 20.04.
 - The backend is async coded so most api calls are made almost simultaneously.
-- You can use it in cli mode or bring up a web interface that refreshes every minute. 
+- You can use it in cli mode or bring up a web interface that refreshes every 30 seconds.
 - You can enable AWS SNS intergration to send a SMS meesage when a delegate misses a block.
 
 ## Changelog
+### 1.1
+
+- compatibility with current Python versions (asyncio.run, timezone-aware datetimes)
+- delegates whose API calls fail now show up with an error state instead of disappearing; failures are logged to stderr
+- fixed a possible division by zero in the yield calculation
+
 ### 1.0
 
 - official release
@@ -53,4 +59,3 @@ If you discover a security vulnerability within this package, please open an iss
 
 - [MIT](LICENSE) © [galperins4](https://github.com/galperins4)
 - [MIT](LICENSE) © [geopsllc](https://github.com/geopsllc)
-

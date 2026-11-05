@@ -3,13 +3,13 @@
 # Imports
 from config import *
 import os
+import sys
 import json
 import asyncio
 import aiohttp
 import aioboto3
 import pandas
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timezone
 from shutil import copy2
 
 # Functions
@@ -24,14 +24,15 @@ async def notifications(msg):
 async def api_get(url):
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=20) as resp:
+        timeout = aiohttp.ClientTimeout(total=20)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url) as resp:
                 return await resp.json()
 
     except asyncio.TimeoutError:
         return 'timeout'
 
-    except:
+    except Exception:
         return 'error'
 
 def get_round(height,network):
@@ -45,23 +46,33 @@ def get_round(height,network):
 
     return result
 
+def report(network,delegate,state,reason):
+
+    # Keep the delegate visible in the CSV/dashboard and log why the check failed
+    print('Network: ' + network + ' | Delegate: ' + delegate + ' | State: ' + state + ' | ' + reason, file=sys.stderr)
+    csv.write(network + ',' + delegate + ',-,-,-,' + state + ',-\n')
+
 async def del_check(network,delegate):
 
     del_info = await api_get(nodes[network] + '/delegates/' + delegate)
-    if del_info == 'error' or del_info == 'timeout':
+    if isinstance(del_info, str):
+        report(network,delegate,'error','delegate info request failed (' + del_info + ')')
         return
 
     del_blocks = await api_get(nodes[network] + '/delegates/' + delegate + '/blocks')
-    if del_blocks == 'error' or del_blocks == 'timeout':
+    if isinstance(del_blocks, str):
+        report(network,delegate,'error','blocks request failed (' + del_blocks + ')')
         return
 
     net_height = await api_get(nodes[network] + '/node/status')
-    if net_height == 'error' or net_height == 'timeout':
+    if isinstance(net_height, str):
+        report(network,delegate,'error','node status request failed (' + net_height + ')')
         return
 
     total_rounds = del_blocks['meta']['count']
 
     if total_rounds < 2:
+        report(network,delegate,'unknown','not enough blocks forged yet to calculate yield')
         return
 
     if del_info['data']['rank'] <= db[network][0]:
@@ -73,8 +84,8 @@ async def del_check(network,delegate):
     forged = 0
     rank = str(del_info['data']['rank'])
     timestamp = del_blocks['data'][0]['timestamp']['unix']
-    utc_remote = datetime.utcfromtimestamp(timestamp)
-    utc_local = datetime.utcnow().replace(microsecond=0)
+    utc_remote = datetime.fromtimestamp(timestamp, timezone.utc)
+    utc_local = datetime.now(timezone.utc).replace(microsecond=0)
     delta = str(round(int((utc_local - utc_remote).total_seconds())/60))
     net_round = get_round(net_height['data']['now'],network)
     cur_round = get_round(del_blocks['data'][0]['height'],network)
@@ -116,13 +127,27 @@ async def del_check(network,delegate):
                     forged = total_rounds - missed
                     break
 
-    prod = str(round((forged * 100)/(forged + missed)))
+    if forged + missed == 0:
+        prod = '0'
+    else:
+        prod = str(round((forged * 100)/(forged + missed)))
 
     print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + forging + ' | Last Block: ' + delta + ' min ago | State: ' + state + ' | Yield: ' + prod + '%')
     csv.write(network + ',' + delegate + ',' + rank + ',' + forging + ',' + delta + ' min ago,' + state + ',' + prod + '%\n')
 
-# Initialize Lists
-tasks = []
+async def safe_check(network,delegate):
+
+    # One malformed response must not take down the checks for every other delegate
+    try:
+        await del_check(network,delegate)
+    except Exception as e:
+        report(network,delegate,'error','unexpected ' + type(e).__name__ + ': ' + str(e))
+
+async def main():
+
+    await asyncio.gather(*(safe_check(network,delegate) for network in delegates for delegate in delegates[network]))
+
+# Initialize State
 savedState = {}
 
 # Initialize CSV
@@ -134,27 +159,22 @@ if os.path.exists('state.json'):
     with open('state.json', 'r') as file:
       savedState = json.load(file)
 
-# Fill in the Lists
+# Fill in the state
 for network in delegates:
     if network not in savedState:
         savedState[network] = {}
     for delegate in delegates[network]:
         if delegate not in savedState[network]:
             savedState[network][delegate] = 'clean'
-        tasks.append(asyncio.ensure_future(del_check(network,delegate)))
 
 # Async Loop
-loop = asyncio.get_event_loop()
-
 try:
-    loop.run_until_complete(asyncio.wait(tasks))
+    asyncio.run(main())
 
 finally:
-    loop.close()
+    csv.close()
 
 # Sort & Cleanup
-csv.close()
-
 csvData = pandas.read_csv("state.csv")
 
 csvData.sort_values(["Network", "Delegate"],
