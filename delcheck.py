@@ -17,7 +17,7 @@ async def notifications(msg):
     # Returns True when Discord accepted the message so callers only mark a
     # delegate as notified after a successful delivery (failed ones retry next run)
     payload = dict(ntfy)
-    payload['content'] = (discord_id + ' ' + msg).strip()
+    payload['content'] = (msg + ' ' + discord_id).strip()
 
     try:
         timeout = aiohttp.ClientTimeout(total=20)
