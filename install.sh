@@ -1,5 +1,3 @@
 #!/bin/bash
 
-sudo apt install python3-pip
-pip3 install aiohttp
-pip3 install pandas
+sudo apt install -y python3-aiohttp python3-pandas
