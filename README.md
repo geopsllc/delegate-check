@@ -24,9 +24,14 @@ This is a DPoS Monitoring Tool for Multiple Delegates Across Multiple Networks.
 - Requires Python 3.7 or above - native on Ubuntu 20.04.
 - The backend is async coded so most api calls are made almost simultaneously.
 - You can use it in cli mode or bring up a web interface that refreshes every 30 seconds.
-- You can enable AWS SNS intergration to send a SMS meesage when a delegate misses a block.
+- You can enable Discord webhook notifications (with an optional @mention) when a delegate misses a block or stops forging.
 
 ## Changelog
+### 1.2
+
+- replaced AWS SNS SMS alerts with Discord webhook notifications (aioboto3 is no longer required)
+- a delegate is only marked as notified after Discord accepts the message, so failed notifications are retried on the next run
+
 ### 1.1
 
 - compatibility with current Python versions (asyncio.run, timezone-aware datetimes)

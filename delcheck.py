@@ -7,7 +7,6 @@ import sys
 import json
 import asyncio
 import aiohttp
-import aioboto3
 import pandas
 from datetime import datetime, timezone
 from shutil import copy2
@@ -15,13 +14,23 @@ from shutil import copy2
 # Functions
 async def notifications(msg):
 
-    session = aioboto3.Session(
-        aws_access_key_id=aws_key_id,
-        aws_secret_access_key=aws_secret_key,
-        region_name=aws_region)
+    # Returns True when Discord accepted the message so callers only mark a
+    # delegate as notified after a successful delivery (failed ones retry next run)
+    payload = dict(ntfy)
+    payload['content'] = (discord_id + ' ' + msg).strip()
 
-    async with session.client('sns') as client:
-        await client.publish(PhoneNumber=phone,Message=msg)
+    try:
+        timeout = aiohttp.ClientTimeout(total=20)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(discord_webhook, json=payload) as resp:
+                if resp.status in (200, 204):
+                    return True
+                print('Discord webhook failed: HTTP ' + str(resp.status), file=sys.stderr)
+
+    except Exception as e:
+        print('Discord webhook failed: ' + type(e).__name__, file=sys.stderr)
+
+    return False
 
 async def api_get(url):
 
@@ -94,17 +103,17 @@ async def del_check(network,delegate):
 
     if forging == 'no':
         state = 'out'
-        if sns_enabled == 'yes' and savedState[network][delegate] == 'clean':
-            await notifications(network + ' delegate ' + delegate + '  not forging!')
-            savedState[network][delegate] = 'dirty'
+        if discord_enabled == 'yes' and savedState[network][delegate] == 'clean':
+            if await notifications(network + ' delegate ' + delegate + ' not forging!'):
+                savedState[network][delegate] = 'dirty'
     elif net_round <= cur_round + 1:
         state = 'healthy'
         savedState[network][delegate] = 'clean'
     else:
         state = 'missing'
-        if sns_enabled == 'yes' and savedState[network][delegate] == 'clean':
-            await notifications(network + ' delegate ' + delegate + '  missed a block!')
-            savedState[network][delegate] = 'dirty'
+        if discord_enabled == 'yes' and savedState[network][delegate] == 'clean':
+            if await notifications(network + ' delegate ' + delegate + ' missed a block!'):
+                savedState[network][delegate] = 'dirty'
 
     if net_round > cur_round + 1:
         missed += net_round - cur_round - 1
