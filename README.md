@@ -28,6 +28,11 @@ This is a DPoS Monitoring Tool for Multiple Delegates Across Multiple Networks.
 - You can set `heartbeat_url` in config.py (e.g. a healthchecks.io ping URL) to get alerted when the script itself stops running.
 
 ## Changelog
+### 1.4
+
+- API requests are retried (3 attempts, 10 second timeout each, 2 and 4 second waits in between) on timeouts, connection errors, 5xx/429 responses and invalid JSON; the settings are at the top of `delcheck.py`
+- failure reasons are more specific (e.g. `HTTP 502`, `timeout`), and non-retryable HTTP errors such as 404 are reported as failed requests instead of an `unexpected KeyError`
+
 ### 1.3
 
 - the backend now writes `web/status.json` (raw values, including the yield and an `updated_at` timestamp) instead of `state.csv`; the dashboard formats everything, computes "X min(s) ago" live and shows a warning when the data is stale

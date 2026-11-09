@@ -11,6 +11,9 @@ import aiohttp
 
 # Settings
 ERROR_ALERT_AFTER = 3 # consecutive failed runs before an API error alert is sent
+API_ATTEMPTS = 3 # tries per API request before giving up
+API_TIMEOUT = 10 # seconds per attempt
+API_RETRY_DELAY = 2 # seconds to wait before the 2nd attempt, doubled before the 3rd (waits grow with each retry)
 heartbeat_url = globals().get('heartbeat_url', '') # optional, set in config.py
 
 # Functions
@@ -52,17 +55,31 @@ async def heartbeat():
 
 async def api_get(url):
 
-    try:
-        timeout = aiohttp.ClientTimeout(total=20)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(url) as resp:
-                return await resp.json()
+    # Retries transient failures (timeouts, connection errors, 5xx, 429, bad JSON) with a growing delay.
+    # Returns the parsed JSON, or a short reason string once every attempt has failed.
+    reason = 'error'
 
-    except asyncio.TimeoutError:
-        return 'timeout'
+    for attempt in range(API_ATTEMPTS):
+        if attempt:
+            await asyncio.sleep(API_RETRY_DELAY * attempt)
 
-    except Exception:
-        return 'error'
+        try:
+            timeout = aiohttp.ClientTimeout(total=API_TIMEOUT)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url) as resp:
+                    if resp.status == 200:
+                        return await resp.json()
+                    reason = 'HTTP ' + str(resp.status)
+                    if resp.status < 500 and resp.status != 429:
+                        return reason # other client errors (e.g. 404) won't fix themselves
+
+        except asyncio.TimeoutError:
+            reason = 'timeout'
+
+        except Exception:
+            reason = 'error'
+
+    return reason
 
 def write_json(path,data):
 
