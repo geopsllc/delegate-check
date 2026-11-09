@@ -17,7 +17,6 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 ui-sans-serif,
 main{max-width:1200px;margin:0 auto;padding:28px 20px 48px}
 header{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;margin-bottom:24px}
 h1{margin:0;font-size:28px;letter-spacing:-.02em}
-.sub{color:var(--muted);font-size:14px}
 .live{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
 .dot{width:10px;height:10px;border-radius:50%;background:var(--muted)}
 .live.ok .dot{background:var(--ok);animation:pulse 2s infinite}
@@ -70,8 +69,8 @@ footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
 <main>
   <header>
     <h1>Delegate Dashboard</h1>
-    <div class="sub" id="count"></div>
-    <div class="live" id="live" role="status" aria-live="polite"><span class="dot"></span><span id="liveText">Loading…</span></div>
+    <div class="live" id="pageLive" role="status" aria-live="polite"><span class="dot"></span><span id="pageText">Loading…</span></div>
+    <div class="live" id="dataLive" role="status" aria-live="polite"><span class="dot"></span><span id="dataText">Loading…</span></div>
   </header>
 
   <div class="prices" id="prices" aria-label="Prices in USD"></div>
@@ -83,6 +82,7 @@ footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
 <script>
 const STATUS_URL = 'status.json';   // written by delcheck.py, relative to this page
 const REFRESH_MS = 30000;        // refresh every 30 seconds
+const FETCH_TIMEOUT_MS = 10000;  // treat the server as unreachable after this long
 const TICK_MS = 15000;           // update "mins ago" text and the stale check every 15 seconds
 const STALE_SECS = 180;          // warn when the backend hasn't written new data for this long
 const PRICE_REFRESH_MS = 300000; // refresh prices every 5 minutes
@@ -92,7 +92,7 @@ const $ = id => document.getElementById(id);
 
 let rows = [], prev = new Map();
 let sortCol = -1, sortDir = 1;
-let updatedAt = null, fetchErr = null, inflight = false;
+let updatedAt = null, lastOk = null, fetchErr = null, inflight = false;
 
 /* "1 min ago" / "5 mins ago", computed from a unix timestamp */
 function agoText(ts){
@@ -122,12 +122,13 @@ async function load(){
   if (inflight) return;
   inflight = true;
   try{
-    const res = await fetch(STATUS_URL + '?t=' + Date.now(), {cache:'no-store'});
+    const res = await fetch(STATUS_URL + '?t=' + Date.now(), {cache:'no-store', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)});
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if (!data || !Array.isArray(data.delegates) || typeof data.updated_at !== 'number') throw new Error('Unexpected file format');
     rows = data.delegates;
     updatedAt = data.updated_at;
+    lastOk = new Date();
     fetchErr = null;
     refreshLive();
     render();
@@ -145,17 +146,19 @@ async function load(){
   } finally { inflight = false; }
 }
 
-function setLive(state, text){
-  $('live').className = 'live ' + state;
-  $('liveText').textContent = text;
+function setLive(prefix, state, text){
+  $(prefix + 'Live').className = 'live ' + state;
+  if ($(prefix + 'Text').textContent !== text) $(prefix + 'Text').textContent = text;
 }
 
-/* Status line: fetch errors, data the backend stopped refreshing, or all good */
+/* Two status lines: can the page reach the server, and is the backend still writing data */
 function refreshLive(){
-  if (fetchErr) setLive('err', 'Update failed: ' + fetchErr + (updatedAt != null ? ' · last data ' + agoText(updatedAt) : ''));
-  else if (updatedAt == null) return;
-  else if (Date.now() / 1000 - updatedAt > STALE_SECS) setLive('err', 'Stale data: last run ' + agoText(updatedAt));
-  else setLive('ok', 'Updated ' + new Date(updatedAt * 1000).toLocaleTimeString());
+  if (fetchErr) setLive('page', 'err', 'Refresh failed: ' + fetchErr + (lastOk ? ' · last refresh ' + lastOk.toLocaleTimeString() : ''));
+  else if (lastOk) setLive('page', 'ok', 'Page refreshed ' + lastOk.toLocaleTimeString());
+
+  if (updatedAt == null) return;
+  if (Date.now() / 1000 - updatedAt > STALE_SECS) setLive('data', 'err', 'Stale data: last run ' + agoText(updatedAt));
+  else setLive('data', 'ok', 'Data updated ' + new Date(updatedAt * 1000).toLocaleTimeString());
 }
 
 function tick(){
@@ -175,7 +178,6 @@ function render(){
       return cmp * sortDir;
     });
   }
-  $('count').textContent = rows.length + ' delegate' + (rows.length === 1 ? '' : 's');
 
   const table = document.createElement('table');
   const trh = table.createTHead().insertRow();
