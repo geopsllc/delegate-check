@@ -153,8 +153,8 @@ function setLive(prefix, state, text){
 
 /* Two status lines: can the page reach the server, and is the backend still writing data */
 function refreshLive(){
-  if (fetchErr) setLive('page', 'err', 'Refresh failed: ' + fetchErr + (lastOk ? ' · last refresh ' + lastOk.toLocaleTimeString() : ''));
-  else if (lastOk) setLive('page', 'ok', 'Page refreshed ' + lastOk.toLocaleTimeString());
+  if (fetchErr) setLive('page', 'err', 'Update failed: ' + fetchErr + (lastOk ? ' · last update ' + lastOk.toLocaleTimeString() : ''));
+  else if (lastOk) setLive('page', 'ok', 'Page updated ' + lastOk.toLocaleTimeString());
 
   if (updatedAt == null) return;
   if (Date.now() / 1000 - updatedAt > STALE_SECS) setLive('data', 'err', 'Stale data: last run ' + agoText(updatedAt));
