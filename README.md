@@ -23,10 +23,20 @@ This is a DPoS Monitoring Tool for Multiple Delegates Across Multiple Networks.
 - Supports Core v2+.
 - Requires Python 3.7 or above - native on Ubuntu 20.04.
 - The backend is async coded so most api calls are made almost simultaneously.
-- You can use it in cli mode or bring up a web interface that refreshes every 30 seconds.
-- You can enable Discord webhook notifications (with an optional @mention) when a delegate misses a block or stops forging.
+- You can use it in cli mode or bring up a web interface that refreshes every 30 seconds. The backend writes `web/status.json` with raw values; the dashboard formats them (for example, "last block" ages are computed live in the browser) and warns when the data stops updating.
+- You can enable Discord webhook notifications (with an optional @mention) when a delegate misses a block, stops forging, or its API checks keep failing, plus a message when it recovers.
+- You can set `heartbeat_url` in config.py (e.g. a healthchecks.io ping URL) to get alerted when the script itself stops running.
 
 ## Changelog
+### 1.3
+
+- the backend now writes `web/status.json` (raw values, including the yield and an `updated_at` timestamp) instead of `state.csv`; the dashboard formats everything, computes "X min(s) ago" live and shows a warning when the data is stale
+- optional `heartbeat_url` ping after every completed run
+- `status.json` and `state.json` are written atomically, and a corrupt `state.json` no longer stops the script
+- the node status is requested once per network instead of once per delegate, and a delegate's requests run concurrently
+- Discord alerts: recovery message when a delegate is healthy again, and an alert after 3 consecutive failed runs of the API checks
+- removed the pandas dependency (only python3-aiohttp is needed now)
+
 ### 1.2
 
 - replaced AWS SNS SMS alerts with Discord webhook notifications (aioboto3 is no longer required)

@@ -9,6 +9,9 @@ if discord_enabled == 'yes':
     if discord_id != '':
         discord_id = '<@' + discord_id + '>'
 
+# Heartbeat (optional, e.g. a healthchecks.io ping URL; pinged after every completed run)
+heartbeat_url = ''
+
 # Delegate Names
 # Leave only the networks and delegates that you use!
 delegates = {

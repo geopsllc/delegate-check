@@ -76,43 +76,40 @@ footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
 
   <div class="prices" id="prices" aria-label="Prices in USD"></div>
 
-  <div class="wrap" id="wrap"><div class="msg">Loading state.csv…</div></div>
+  <div class="wrap" id="wrap"><div class="msg">Loading status.json…</div></div>
   <footer>*Yield: productivity calculated over the last 100 rounds.<br>Prices by <a href="https://www.coingecko.com" style="color:inherit">CoinGecko</a></footer>
 </main>
 
 <script>
-const CSV_URL = 'state.csv';     // path to your CSV, relative to this page
+const STATUS_URL = 'status.json';   // written by delcheck.py, relative to this page
 const REFRESH_MS = 30000;        // refresh every 30 seconds
+const TICK_MS = 15000;           // update "mins ago" text and the stale check every 15 seconds
+const STALE_SECS = 180;          // warn when the backend hasn't written new data for this long
 const PRICE_REFRESH_MS = 300000; // refresh prices every 5 minutes
 const CG_API_KEY = '';           // optional free CoinGecko Demo key
 let priceIds = [], prices = {}, lastPriceFetch = 0, priceTimer = null;
 const $ = id => document.getElementById(id);
 
-let header = [], rows = [], prev = new Map();
+let rows = [], prev = new Map();
 let sortCol = -1, sortDir = 1;
-let lastOk = null, inflight = false;
+let updatedAt = null, fetchErr = null, inflight = false;
 
-/* Small RFC 4180 CSV parser (quotes, escaped quotes, CRLF) */
-function parseCSV(text){
-  const out = []; let row = [], cell = '', q = false;
-  for (let i = 0; i < text.length; i++){
-    const c = text[i];
-    if (q){
-      if (c === '"'){ if (text[i+1] === '"'){ cell += '"'; i++; } else q = false; }
-      else cell += c;
-    } else if (c === '"') q = true;
-    else if (c === ','){ row.push(cell); cell = ''; }
-    else if (c === '\n' || c === '\r'){
-      if (c === '\r' && text[i+1] === '\n') i++;
-      row.push(cell); cell = '';
-      if (row.some(v => v.trim() !== '')) out.push(row);
-      row = [];
-    } else cell += c;
-  }
-  row.push(cell);
-  if (row.some(v => v.trim() !== '')) out.push(row);
-  return out;
+/* "1 min ago" / "5 mins ago", computed from a unix timestamp */
+function agoText(ts){
+  const mins = Math.max(0, Math.round((Date.now() / 1000 - ts) / 60));
+  return mins + (mins === 1 ? ' min ago' : ' mins ago');
 }
+
+/* Columns: val = raw value, key = sort key (defaults to val), fmt = display text */
+const COLS = [
+  {label:'Network',    val: r => r.network},
+  {label:'Delegate',   val: r => r.delegate},
+  {label:'Rank',       val: r => r.rank},
+  {label:'Forging',    val: r => r.forging == null ? null : (r.forging ? 'yes' : 'no')},
+  {label:'Last Block', val: r => r.last_block, key: r => r.last_block == null ? null : -r.last_block, fmt: agoText, age: true},
+  {label:'State',      val: r => r.state},
+  {label:'Yield',      val: r => r['yield'], fmt: v => v + '%'}
+];
 
 const GOOD = new Set(['yes','healthy','true','ok','online','active','synced','up']);
 const BAD  = new Set(['no','unhealthy','false','offline','down','missing','error','stopped','failed']);
@@ -125,41 +122,56 @@ async function load(){
   if (inflight) return;
   inflight = true;
   try{
-    const res = await fetch(CSV_URL + '?t=' + Date.now(), {cache:'no-store'});
+    const res = await fetch(STATUS_URL + '?t=' + Date.now(), {cache:'no-store'});
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = parseCSV(await res.text());
-    if (!data.length) throw new Error('The file is empty');
-    header = data[0]; rows = data.slice(1);
-    lastOk = new Date();
-    setLive('ok');
+    const data = await res.json();
+    if (!data || !Array.isArray(data.delegates) || typeof data.updated_at !== 'number') throw new Error('Unexpected file format');
+    rows = data.delegates;
+    updatedAt = data.updated_at;
+    fetchErr = null;
+    refreshLive();
     render();
     if (!priceTimer){ priceTimer = setInterval(loadPrices, PRICE_REFRESH_MS); loadPrices(); }
   } catch (e){
-    setLive('err', e.message);
+    fetchErr = e.message;
+    refreshLive();
     if (!rows.length){
       $('wrap').innerHTML = '';
       const m = document.createElement('div');
       m.className = 'msg error';
-      m.textContent = 'Could not load ' + CSV_URL + ' (' + e.message + '). Serve this page from a web server next to the CSV; browsers block file:// reads.';
+      m.textContent = 'Could not load ' + STATUS_URL + ' (' + e.message + '). Serve this page from a web server next to the JSON file; browsers block file:// reads.';
       $('wrap').append(m);
     }
   } finally { inflight = false; }
 }
 
-function setLive(state, err){
+function setLive(state, text){
   $('live').className = 'live ' + state;
-  $('liveText').textContent = state === 'ok'
-    ? 'Updated ' + lastOk.toLocaleTimeString()
-    : 'Update failed: ' + err + (lastOk ? ' · last good ' + lastOk.toLocaleTimeString() : '');
+  $('liveText').textContent = text;
+}
+
+/* Status line: fetch errors, data the backend stopped refreshing, or all good */
+function refreshLive(){
+  if (fetchErr) setLive('err', 'Update failed: ' + fetchErr + (updatedAt != null ? ' · last data ' + agoText(updatedAt) : ''));
+  else if (updatedAt == null) return;
+  else if (Date.now() / 1000 - updatedAt > STALE_SECS) setLive('err', 'Stale data: last run ' + agoText(updatedAt));
+  else setLive('ok', 'Updated ' + new Date(updatedAt * 1000).toLocaleTimeString());
+}
+
+function tick(){
+  document.querySelectorAll('td[data-ts]').forEach(td => { td.textContent = agoText(+td.dataset.ts); });
+  refreshLive();
 }
 
 function render(){
   let view = rows.slice();
   if (sortCol >= 0){
+    const col = COLS[sortCol];
+    const key = r => col.key ? col.key(r) : col.val(r);
     view.sort((a,b) => {
-      const x = a[sortCol] ?? '', y = b[sortCol] ?? '';
-      const nx = parseFloat(x), ny = parseFloat(y);
-      const cmp = (!isNaN(nx) && !isNaN(ny)) ? nx - ny : x.localeCompare(y, undefined, {numeric:true});
+      const x = key(a), y = key(b);
+      if (x == null || y == null) return (x == null) - (y == null);   // empty values always last
+      const cmp = typeof x === 'number' ? x - y : String(x).localeCompare(String(y), undefined, {numeric:true});
       return cmp * sortDir;
     });
   }
@@ -167,9 +179,9 @@ function render(){
 
   const table = document.createElement('table');
   const trh = table.createTHead().insertRow();
-  header.forEach((h, j) => {
+  COLS.forEach((c, j) => {
     const th = document.createElement('th');
-    th.textContent = h; th.tabIndex = 0;
+    th.textContent = c.label; th.tabIndex = 0;
     th.setAttribute('aria-sort', j === sortCol ? (sortDir > 0 ? 'ascending' : 'descending') : 'none');
     const go = () => { sortDir = (sortCol === j) ? -sortDir : 1; sortCol = j; render(); };
     th.onclick = go;
@@ -180,32 +192,32 @@ function render(){
   const tb = table.createTBody();
   view.forEach(r => {
     const tr = tb.insertRow();
-    header.forEach((_, j) => {
-      const v = r[j] ?? '', td = tr.insertCell(), k = kind(v);
-      td.dataset.label = header[j];
+    COLS.forEach((c, j) => {
+      const raw = c.val(r), td = tr.insertCell();
+      const v = raw == null ? '-' : (c.fmt ? c.fmt(raw) : String(raw)), k = kind(v);
+      td.dataset.label = c.label;
+      if (c.age && raw != null) td.dataset.ts = raw;
       if (k){
         const b = document.createElement('span');
         b.className = 'badge ' + k; b.textContent = v; td.append(b);
       } else td.textContent = v;
-      const id = r[0] + '|' + j;
-      if (prev.size && prev.has(id) && prev.get(id) !== v) td.classList.add('flash');
+      const id = r.network + '|' + r.delegate + '|' + j;
+      if (prev.size && prev.has(id) && prev.get(id) !== String(raw)) td.classList.add('flash');
     });
   });
   prev = new Map();
-  rows.forEach(r => header.forEach((_, j) => prev.set(r[0] + '|' + j, r[j] ?? '')));
+  rows.forEach(r => COLS.forEach((c, j) => prev.set(r.network + '|' + r.delegate + '|' + j, String(c.val(r)))));
 
   $('wrap').innerHTML = '';
   if (view.length) $('wrap').append(table);
-  else { const m = document.createElement('div'); m.className = 'msg'; m.textContent = 'No delegates found in ' + CSV_URL + '.'; $('wrap').append(m); }
+  else { const m = document.createElement('div'); m.className = 'msg'; m.textContent = 'No delegates found in ' + STATUS_URL + '.'; $('wrap').append(m); }
 }
 
-/* Prices: BTC plus every distinct value in the Network column, lowercased, as CoinGecko IDs */
+/* Prices: BTC plus every distinct network name, lowercased, as CoinGecko IDs */
 async function loadPrices(){
-  let col = header.findIndex(h => h.trim().toLowerCase() === 'network');
-  if (col < 0) col = 0;
   const ids = new Set(['bitcoin']);
   rows.forEach(r => {
-    const id = (r[col] || '').trim().toLowerCase().replace(/\s+/g, '-');
+    const id = (r.network || '').trim().toLowerCase().replace(/\s+/g, '-');
     if (id) ids.add(id);
   });
   priceIds = [...ids];
@@ -241,9 +253,11 @@ function renderPrices(){
 }
 
 setInterval(load, REFRESH_MS);
+setInterval(tick, TICK_MS);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
   load();
+  tick();
   if (priceTimer && Date.now() - lastPriceFetch > PRICE_REFRESH_MS) loadPrices();
 });
 load();

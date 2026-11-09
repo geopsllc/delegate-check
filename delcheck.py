@@ -5,11 +5,13 @@ from config import *
 import os
 import sys
 import json
+import time
 import asyncio
 import aiohttp
-import pandas
-from datetime import datetime, timezone
-from shutil import copy2
+
+# Settings
+ERROR_ALERT_AFTER = 3 # consecutive failed runs before an API error alert is sent
+heartbeat_url = globals().get('heartbeat_url', '') # optional, set in config.py
 
 # Functions
 async def notifications(msg):
@@ -32,6 +34,22 @@ async def notifications(msg):
 
     return False
 
+async def heartbeat():
+
+    # Optional dead man's switch (healthchecks.io style): pinged after every completed run
+    if heartbeat_url == '':
+        return
+
+    try:
+        timeout = aiohttp.ClientTimeout(total=20)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(heartbeat_url) as resp:
+                if resp.status >= 400:
+                    print('Heartbeat failed: HTTP ' + str(resp.status), file=sys.stderr)
+
+    except Exception as e:
+        print('Heartbeat failed: ' + type(e).__name__, file=sys.stderr)
+
 async def api_get(url):
 
     try:
@@ -46,6 +64,14 @@ async def api_get(url):
     except Exception:
         return 'error'
 
+def write_json(path,data):
+
+    # Write to a temp file and swap it in, so readers never see a partial file
+    tmp = path + '.tmp'
+    with open(tmp, 'w') as file:
+        json.dump(data, file)
+    os.replace(tmp, path)
+
 def get_round(height,network):
 
     data = divmod(height,db[network][0])
@@ -57,63 +83,30 @@ def get_round(height,network):
 
     return result
 
-def report(network,delegate,state,reason):
+def ago(timestamp):
 
-    # Keep the delegate visible in the CSV/dashboard and log why the check failed
-    print('Network: ' + network + ' | Delegate: ' + delegate + ' | State: ' + state + ' | ' + reason, file=sys.stderr)
-    csv.write(network + ',' + delegate + ',-,-,-,' + state + ',-\n')
+    mins = max(0, round((time.time() - timestamp)/60))
 
-async def del_check(network,delegate):
+    if mins == 1:
+        return '1 min ago'
 
-    del_info = await api_get(nodes[network] + '/delegates/' + delegate)
-    if isinstance(del_info, str):
-        report(network,delegate,'error','delegate info request failed (' + del_info + ')')
-        return
+    return str(mins) + ' mins ago'
 
-    del_blocks = await api_get(nodes[network] + '/delegates/' + delegate + '/blocks')
-    if isinstance(del_blocks, str):
-        report(network,delegate,'error','blocks request failed (' + del_blocks + ')')
-        return
+def new_record(network,delegate):
 
-    net_height = await api_get(nodes[network] + '/node/status')
-    if isinstance(net_height, str):
-        report(network,delegate,'error','node status request failed (' + net_height + ')')
-        return
+    # Raw values only - the dashboard formats them (ages are computed live in the browser)
+    return {'network': network, 'delegate': delegate, 'rank': None, 'forging': None, 'last_block': None, 'state': 'error', 'yield': None}
 
-    total_rounds = del_blocks['meta']['count']
+def log_failure(network,delegate,reason):
 
-    if total_rounds < 2:
-        report(network,delegate,'unknown','not enough blocks forged yet to calculate yield')
-        return
+    print('Network: ' + network + ' | Delegate: ' + delegate + ' | State: error | ' + reason, file=sys.stderr)
 
-    if del_info['data']['rank'] <= db[network][0]:
-        forging = 'yes'
-    else:
-        forging = 'no'
+def calc_yield(del_blocks,total_rounds,net_round,network):
 
+    # Percentage of the last total_rounds rounds in which the delegate forged a block
     missed = 0
     forged = 0
-    rank = str(del_info['data']['rank'])
-    timestamp = del_blocks['data'][0]['timestamp']['unix']
-    utc_remote = datetime.fromtimestamp(timestamp, timezone.utc)
-    utc_local = datetime.now(timezone.utc).replace(microsecond=0)
-    delta = str(round(int((utc_local - utc_remote).total_seconds())/60))
-    net_round = get_round(net_height['data']['now'],network)
     cur_round = get_round(del_blocks['data'][0]['height'],network)
-
-    if forging == 'no':
-        state = 'out'
-        if discord_enabled == 'yes' and savedState[network][delegate] == 'clean':
-            if await notifications(network + ' delegate ' + delegate + ' not forging!'):
-                savedState[network][delegate] = 'dirty'
-    elif net_round <= cur_round + 1:
-        state = 'healthy'
-        savedState[network][delegate] = 'clean'
-    else:
-        state = 'missing'
-        if discord_enabled == 'yes' and savedState[network][delegate] == 'clean':
-            if await notifications(network + ' delegate ' + delegate + ' missed a block!'):
-                savedState[network][delegate] = 'dirty'
 
     if net_round > cur_round + 1:
         missed += net_round - cur_round - 1
@@ -139,38 +132,125 @@ async def del_check(network,delegate):
                     break
 
     if forged + missed == 0:
-        prod = '0'
+        return 0
+
+    return round((forged * 100)/(forged + missed))
+
+async def del_check(network,delegate,net_status):
+
+    record = new_record(network,delegate)
+
+    if isinstance(net_status, str):
+        log_failure(network,delegate,'node status request failed (' + net_status + ')')
+        return record
+
+    del_info, del_blocks = await asyncio.gather(
+        api_get(nodes[network] + '/delegates/' + delegate),
+        api_get(nodes[network] + '/delegates/' + delegate + '/blocks'))
+
+    if isinstance(del_info, str):
+        log_failure(network,delegate,'delegate info request failed (' + del_info + ')')
+        return record
+
+    if isinstance(del_blocks, str):
+        log_failure(network,delegate,'blocks request failed (' + del_blocks + ')')
+        return record
+
+    total_rounds = del_blocks['meta']['count']
+
+    if total_rounds < 2:
+        print('Network: ' + network + ' | Delegate: ' + delegate + ' | State: unknown | not enough blocks forged yet to calculate yield', file=sys.stderr)
+        record['state'] = 'unknown'
+        return record
+
+    rank = del_info['data']['rank']
+    forging = rank <= db[network][0]
+    last_block = del_blocks['data'][0]['timestamp']['unix']
+    net_round = get_round(net_status['data']['now'],network)
+    cur_round = get_round(del_blocks['data'][0]['height'],network)
+
+    if not forging:
+        state = 'out'
+    elif net_round <= cur_round + 1:
+        state = 'healthy'
     else:
-        prod = str(round((forged * 100)/(forged + missed)))
+        state = 'missing'
 
-    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + rank + ' | Forging: ' + forging + ' | Last Block: ' + delta + ' min ago | State: ' + state + ' | Yield: ' + prod + '%')
-    csv.write(network + ',' + delegate + ',' + rank + ',' + forging + ',' + delta + ' min ago,' + state + ',' + prod + '%\n')
+    record['rank'] = rank
+    record['forging'] = forging
+    record['last_block'] = last_block
+    record['state'] = state
+    record['yield'] = calc_yield(del_blocks,total_rounds,net_round,network)
 
-async def safe_check(network,delegate):
+    print('Network: ' + network + ' | Delegate: ' + delegate + ' | Rank: ' + str(rank) + ' | Forging: ' + ('yes' if forging else 'no') + ' | Last Block: ' + ago(last_block) + ' | State: ' + state + ' | Yield: ' + str(record['yield']) + '%')
+
+    return record
+
+async def safe_check(network,delegate,net_status):
 
     # One malformed response must not take down the checks for every other delegate
     try:
-        await del_check(network,delegate)
+        return await del_check(network,delegate,net_status)
     except Exception as e:
-        report(network,delegate,'error','unexpected ' + type(e).__name__ + ': ' + str(e))
+        log_failure(network,delegate,'unexpected ' + type(e).__name__ + ': ' + str(e))
+        return new_record(network,delegate)
+
+async def update_alerts(network,delegate,state):
+
+    # savedState: 'clean' = no open alert, 'dirty' = alert sent and not yet recovered
+    key = network + '|' + delegate
+    failures[key] = failures.get(key, 0) + 1 if state == 'error' else 0
+    current = savedState[network][delegate]
+    prefix = network + ' delegate ' + delegate + ' '
+
+    if state == 'healthy':
+        if current == 'dirty' and (discord_enabled != 'yes' or await notifications(prefix + 'recovered!')):
+            savedState[network][delegate] = 'clean'
+        return
+
+    if state == 'out':
+        msg = 'not forging!'
+    elif state == 'missing':
+        msg = 'missed a block!'
+    elif state == 'error' and failures[key] >= ERROR_ALERT_AFTER:
+        msg = 'API check failing!'
+    else:
+        return
+
+    if discord_enabled == 'yes' and current == 'clean' and await notifications(prefix + msg):
+        savedState[network][delegate] = 'dirty'
 
 async def main():
 
-    await asyncio.gather(*(safe_check(network,delegate) for network in delegates for delegate in delegates[network]))
+    # The node status is per network, so fetch it once instead of once per delegate
+    networks = list(delegates)
+    statuses = await asyncio.gather(*(api_get(nodes[network] + '/node/status') for network in networks))
+    net_status = dict(zip(networks, statuses))
 
-# Initialize State
-savedState = {}
+    results = await asyncio.gather(*(safe_check(network,delegate,net_status[network]) for network in networks for delegate in delegates[network]))
+    results = sorted(results, key=lambda r: (r['network'], r['delegate']))
 
-# Initialize CSV
-csv = open('state.csv','w+')
-csv.write('Network,Delegate,Rank,Forging,Last Block,State,Yield\n')
+    for record in results:
+        await update_alerts(record['network'],record['delegate'],record['state'])
+
+    write_json('web/status.json', {'updated_at': int(time.time()), 'delegates': results})
+    write_json('state.json', savedState)
+
+    await heartbeat()
 
 # Load JSON state file
+savedState = {}
+
 if os.path.exists('state.json'):
-    with open('state.json', 'r') as file:
-      savedState = json.load(file)
+    try:
+        with open('state.json', 'r') as file:
+            savedState = json.load(file)
+    except (OSError, ValueError) as e:
+        print('Could not read state.json, starting fresh: ' + type(e).__name__, file=sys.stderr)
 
 # Fill in the state
+failures = savedState.setdefault('_failures', {})
+
 for network in delegates:
     if network not in savedState:
         savedState[network] = {}
@@ -179,22 +259,4 @@ for network in delegates:
             savedState[network][delegate] = 'clean'
 
 # Async Loop
-try:
-    asyncio.run(main())
-
-finally:
-    csv.close()
-
-# Sort & Cleanup
-csvData = pandas.read_csv("state.csv")
-
-csvData.sort_values(["Network", "Delegate"],
-                    axis=0,
-                    inplace=True)
-
-csvData.to_csv('state.csv', index=False)
-
-copy2('state.csv','web/')
-
-with open('state.json', 'w+') as file:
-  json.dump(savedState, file)
+asyncio.run(main())
