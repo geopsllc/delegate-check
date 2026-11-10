@@ -105,9 +105,9 @@ def ago(timestamp):
     mins = max(0, round((time.time() - timestamp)/60))
 
     if mins == 1:
-        return '1 min ago'
+        return '1 minute ago'
 
-    return str(mins) + ' mins ago'
+    return str(mins) + ' minutes ago'
 
 def new_record(network,delegate):
 
