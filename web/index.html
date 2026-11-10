@@ -42,20 +42,6 @@ td.flash{animation:flash 2.4s ease-out}
 .msg{padding:28px 20px;text-align:center;color:var(--muted)}
 .msg.error{color:var(--bad)}
 footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
-@media (max-width:640px){
-  main{padding:20px 12px 36px}
-  h1{font-size:24px}
-  .price{flex:1 1 40%}
-  .wrap{background:none;border:0;border-radius:0;overflow:visible}
-  table,tbody,tr,td{display:block;width:100%;min-width:0}
-  thead{display:none}
-  tr{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;padding:6px 0}
-  td{display:flex;justify-content:space-between;align-items:center;gap:16px;border:0;padding:6px 14px;white-space:normal;text-align:right}
-  td::before{content:attr(data-label);color:var(--muted);font-size:13px;text-align:left}
-  td:first-child{font-weight:600;font-size:16px;padding-bottom:8px;margin-bottom:2px;border-bottom:1px solid var(--line)}
-  td:first-child::before{display:none}
-  tbody tr:hover{background:var(--surface)}
-}
 .prices{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:20px}
 .prices:empty{display:none}
 .price{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 14px;text-align:center;min-width:120px}
@@ -65,6 +51,32 @@ footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
 .price .c.up{color:var(--ok)}
 .price .c.down{color:var(--bad)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+@media (max-width:640px){
+  main{padding:14px 12px 28px}
+  header{margin-bottom:12px}
+  h1{font-size:22px}
+  .prices{gap:8px;margin-bottom:12px}
+  .price{flex:1 1 30%;min-width:0;padding:6px 10px}
+  .wrap{background:none;border:0;border-radius:0;overflow:visible}
+  table,tbody,tr,td{display:block;width:100%;min-width:0}
+  thead{display:none}
+  /* compact card: title row (network, delegate, state), then a row of small stats */
+  tr{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;padding:8px 12px}
+  tr::before{content:"";order:4;flex:0 0 100%;height:0}
+  td{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:auto;min-width:0;overflow:hidden;border:0;padding:0;white-space:nowrap;text-align:left}
+  td::before{content:attr(data-label);color:var(--muted);font-size:11px;line-height:1.2}
+  td:nth-child(1),td:nth-child(2),td:nth-child(6){flex-direction:row;align-items:center}
+  td:nth-child(1)::before,td:nth-child(2)::before,td:nth-child(6)::before{display:none}
+  td:nth-child(1){order:1;flex:0 0 auto;min-width:3em;color:var(--muted);font-weight:600}
+  td:nth-child(2){order:2;flex:1 1 0;min-width:0;display:block;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-size:16px}
+  td:nth-child(6){order:3}
+  /* fixed proportions so the stat columns line up from card to card (100% minus the three 8px gaps) */
+  td:nth-child(3){order:5;flex:0 0 calc((100% - 24px) * .14)}
+  td:nth-child(4){order:6;flex:0 0 calc((100% - 24px) * .22)}
+  td:nth-child(7){order:7;flex:0 0 calc((100% - 24px) * .18)}
+  td:nth-child(5){order:8;flex:0 0 calc((100% - 24px) * .46)}
+  tbody tr:hover{background:var(--surface)}
+}
 </style>
 </head>
 <body>
@@ -117,7 +129,7 @@ const COLS = [
 ];
 
 const GOOD = new Set(['yes','healthy','true','ok','online','active','synced','up']);
-const BAD  = new Set(['no','unhealthy','false','offline','down','missing','error','stopped','failed']);
+const BAD  = new Set(['no','unhealthy','false','offline','down','missing','error','stopped','failed','out']);
 function kind(v){
   const s = v.trim().toLowerCase();
   return GOOD.has(s) ? 'ok' : BAD.has(s) ? 'bad' : '';
