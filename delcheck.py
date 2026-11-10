@@ -104,10 +104,14 @@ def ago(timestamp):
 
     mins = max(0, round((time.time() - timestamp)/60))
 
-    if mins == 1:
-        return '1 minute ago'
+    if mins >= 1440:
+        value, unit = mins // 1440, 'day'
+    elif mins >= 60:
+        value, unit = mins // 60, 'hour'
+    else:
+        value, unit = mins, 'minute'
 
-    return str(mins) + ' minutes ago'
+    return str(value) + ' ' + unit + ('' if value == 1 else 's') + ' ago'
 
 def new_record(network,delegate):
 

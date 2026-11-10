@@ -31,6 +31,12 @@ This is a DPoS Monitoring Tool for Multiple Delegates Across Multiple Networks.
 - You can set `heartbeat_url` in config.py (e.g. a healthchecks.io ping URL) to get alerted when the script itself stops running.
 
 ## Changelog
+### 1.6
+
+- ages ("last block", stale warning, cli output) are shown in minutes, hours or days, e.g. "1 minute ago", "3 hours ago", "2 days ago"
+- larger, easier to read delegate cards on mobile: a title row (network, delegate, state) and a row of stats, so about three cards fit on one screen
+- the "out" state gets a red badge like the other bad states
+
 ### 1.5
 
 - `config.py` is no longer tracked: copy `config.example.py` to `config.py` (`install.sh` does it); the CoinGecko key moved from `web/index.html` to the optional, git-ignored `web/local.js` (see `web/local.example.js`); a `.gitignore` covers both plus the generated files

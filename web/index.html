@@ -52,28 +52,28 @@ footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
 .price .c.down{color:var(--bad)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 @media (max-width:640px){
-  main{padding:14px 12px 28px}
-  header{margin-bottom:12px}
-  h1{font-size:22px}
-  .prices{gap:8px;margin-bottom:12px}
-  .price{flex:1 1 30%;min-width:0;padding:6px 10px}
+  main{padding:18px 12px 32px}
+  header{margin-bottom:14px}
+  h1{font-size:24px}
+  .prices{gap:8px;margin-bottom:14px}
+  .price{flex:1 1 30%;min-width:0;padding:8px 10px}
   .wrap{background:none;border:0;border-radius:0;overflow:visible}
   table,tbody,tr,td{display:block;width:100%;min-width:0}
   thead{display:none}
-  /* compact card: title row (network, delegate, state), then a row of small stats */
-  tr{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;padding:8px 12px}
+  /* card: title row (network, delegate, state), then a row of small stats */
+  tr{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;padding:15px 16px}
   tr::before{content:"";order:4;flex:0 0 100%;height:0}
-  td{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:auto;min-width:0;overflow:hidden;border:0;padding:0;white-space:nowrap;text-align:left}
-  td::before{content:attr(data-label);color:var(--muted);font-size:11px;line-height:1.2}
+  td{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:auto;min-width:0;overflow:hidden;border:0;padding:0;white-space:nowrap;text-align:left}
+  td::before{content:attr(data-label);color:var(--muted);font-size:12px;line-height:1.2}
   td:nth-child(1),td:nth-child(2),td:nth-child(6){flex-direction:row;align-items:center}
   td:nth-child(1)::before,td:nth-child(2)::before,td:nth-child(6)::before{display:none}
-  td:nth-child(1){order:1;flex:0 0 auto;min-width:3em;color:var(--muted);font-weight:600}
-  td:nth-child(2){order:2;flex:1 1 0;min-width:0;display:block;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-size:16px}
+  td:nth-child(1){order:1;flex:0 0 auto;min-width:3em;color:var(--muted);font-weight:600;font-size:16px}
+  td:nth-child(2){order:2;flex:1 1 0;min-width:0;display:block;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-size:17px}
   td:nth-child(6){order:3}
   /* fixed proportions so the stat columns line up from card to card (100% minus the three 8px gaps) */
   td:nth-child(3){order:5;flex:0 0 calc((100% - 24px) * .14)}
-  td:nth-child(4){order:6;flex:0 0 calc((100% - 24px) * .22)}
-  td:nth-child(7){order:7;flex:0 0 calc((100% - 24px) * .18)}
+  td:nth-child(4){order:6;flex:0 0 calc((100% - 24px) * .21)}
+  td:nth-child(7){order:7;flex:0 0 calc((100% - 24px) * .19)}
   td:nth-child(5){order:8;flex:0 0 calc((100% - 24px) * .46)}
   tbody tr:hover{background:var(--surface)}
 }
@@ -100,7 +100,7 @@ footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
 const STATUS_URL = 'status.json';   // written by delcheck.py, relative to this page
 const REFRESH_MS = 30000;        // refresh every 30 seconds
 const FETCH_TIMEOUT_MS = 10000;  // treat the server as unreachable after this long
-const TICK_MS = 15000;           // update "minutes ago" text and the stale check every 15 seconds
+const TICK_MS = 15000;           // update the "X ago" text and the stale check every 15 seconds
 const STALE_SECS = 180;          // warn when the backend hasn't written new data for this long
 const PRICE_REFRESH_MS = 300000; // refresh prices every 5 minutes
 const CG_API_KEY = window.CG_API_KEY || ''; // optional free CoinGecko Demo key, set in web/local.js
@@ -111,10 +111,13 @@ let rows = [], prev = new Map();
 let sortCol = -1, sortDir = 1;
 let updatedAt = null, lastOk = null, fetchErr = null, inflight = false;
 
-/* "1 minute ago" / "5 minutes ago", computed from a unix timestamp */
+/* "1 minute ago" / "5 minutes ago" / "3 hours ago" / "2 days ago", computed from a unix timestamp */
 function agoText(ts){
   const mins = Math.max(0, Math.round((Date.now() / 1000 - ts) / 60));
-  return mins + (mins === 1 ? ' minute ago' : ' minutes ago');
+  let n = mins, unit = 'minute';
+  if (mins >= 1440){ n = Math.floor(mins / 1440); unit = 'day'; }
+  else if (mins >= 60){ n = Math.floor(mins / 60); unit = 'hour'; }
+  return n + ' ' + unit + (n === 1 ? '' : 's') + ' ago';
 }
 
 /* Columns: val = raw value, key = sort key (defaults to val), fmt = display text */
