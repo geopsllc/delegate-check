@@ -67,9 +67,10 @@ footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
   td::before{content:attr(data-label);color:var(--muted);font-size:12px;line-height:1.2}
   td:nth-child(1),td:nth-child(2),td:nth-child(6){flex-direction:row;align-items:center}
   td:nth-child(1)::before,td:nth-child(2)::before,td:nth-child(6)::before{display:none}
-  td:nth-child(1){order:1;flex:0 0 auto;min-width:3em;color:var(--muted);font-weight:600;font-size:16px}
+  /* network: wide enough for a name like "monolythium" (about 102px); longer names get an ellipsis so the delegate name keeps its room */
+  td:nth-child(1){order:1;flex:0 1 auto;display:block;min-width:3em;max-width:7.5em;overflow:hidden;text-overflow:ellipsis;color:var(--muted);font-weight:600;font-size:16px}
   td:nth-child(2){order:2;flex:1 1 0;min-width:0;display:block;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-size:17px}
-  td:nth-child(6){order:3}
+  td:nth-child(6){order:3;flex:0 0 auto}
   /* fixed proportions so the stat columns line up from card to card (100% minus the three 8px gaps) */
   td:nth-child(3){order:5;flex:0 0 calc((100% - 24px) * .14)}
   td:nth-child(4){order:6;flex:0 0 calc((100% - 24px) * .21)}
