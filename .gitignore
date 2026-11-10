@@ -1,0 +1,9 @@
+# Local configuration (copy from config.example.py / web/local.example.js)
+config.py
+web/local.js
+
+# Generated at runtime
+__pycache__/
+state.json
+web/status.json
+*.tmp

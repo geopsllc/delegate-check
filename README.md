@@ -9,7 +9,10 @@ cd delegate-check
 bash install.sh
 nano config.py
 ```
+- `install.sh` installs the dependencies and creates `config.py` from `config.example.py`
 - change config.py to your liking
+- `config.py` and `web/local.js` are git-ignored, so `git pull` never touches your settings; new options show up in `config.example.py`
+- optional: copy `web/local.example.js` to `web/local.js` to set a CoinGecko API key for the dashboard
 - test the script in cli mode by running ```python3 delcheck.py```
 
 Frontend setup:
@@ -28,6 +31,11 @@ This is a DPoS Monitoring Tool for Multiple Delegates Across Multiple Networks.
 - You can set `heartbeat_url` in config.py (e.g. a healthchecks.io ping URL) to get alerted when the script itself stops running.
 
 ## Changelog
+### 1.5
+
+- `config.py` is no longer tracked: copy `config.example.py` to `config.py` (`install.sh` does it); the CoinGecko key moved from `web/index.html` to the optional, git-ignored `web/local.js` (see `web/local.example.js`); a `.gitignore` covers both plus the generated files
+- upgrading from 1.4 or earlier: back up your `config.py` (and your CoinGecko key if you added it to `web/index.html`), run `git checkout -- config.py web/index.html`, `git pull`, then restore `config.py` and put the key in `web/local.js`
+
 ### 1.4
 
 - API requests are retried (3 attempts, 10 second timeout each, 2 and 4 second waits in between) on timeouts, connection errors, 5xx/429 responses and invalid JSON; the settings are at the top of `delcheck.py`
