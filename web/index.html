@@ -93,7 +93,7 @@ footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
   <div class="prices" id="prices" aria-label="Prices in USD"></div>
 
   <div class="wrap" id="wrap"><div class="msg">Loading status.json…</div></div>
-  <footer>*Yield: productivity calculated over the last 100 rounds.<br>Prices by <a href="https://www.coingecko.com" style="color:inherit">CoinGecko</a></footer>
+  <footer>*Yield: productivity calculated over the last 100 rounds.<br><span id="credit"></span></footer>
 </main>
 
 <script src="local.js"></script> <!-- optional, git-ignored: see local.example.js -->
@@ -104,7 +104,10 @@ const FETCH_TIMEOUT_MS = 10000;  // treat the server as unreachable after this l
 const TICK_MS = 15000;           // update the "X ago" text and the stale check every 15 seconds
 const STALE_SECS = 180;          // warn when the backend hasn't written new data for this long
 const PRICE_REFRESH_MS = 300000; // refresh prices every 5 minutes
-const CG_API_KEY = window.CG_API_KEY || ''; // optional free CoinGecko Demo key, set in web/local.js
+/* Optional settings from web/local.js (see local.example.js). With nothing set, prices come from keyless CoinGecko. */
+const CG_API_KEY  = window.CG_API_KEY  || '';   // CoinGecko Demo key
+const LCW_API_KEY = window.LCW_API_KEY || '';   // LiveCoinWatch key
+const PRICE_SYMBOLS = window.PRICE_SYMBOLS || {}; // LiveCoinWatch ticker overrides, e.g. {monolythium: 'LYTH'}
 let priceIds = [], prices = {}, lastPriceFetch = 0, priceTimer = null;
 const $ = id => document.getElementById(id);
 
@@ -238,8 +241,67 @@ function render(){
   else { const m = document.createElement('div'); m.className = 'msg'; m.textContent = 'No delegates found in ' + STATUS_URL + '.'; $('wrap').append(m); }
 }
 
-/* Prices: BTC plus every distinct network name, lowercased, as CoinGecko IDs */
+/* Prices: BTC plus every distinct network name. Each provider turns a list of ids (lowercased network
+   names, "bitcoin") into {id: {usd, change}}, where change is the 24h change in percent. */
+const LCW_DEFAULT_SYMBOLS = {bitcoin: 'BTC'};   // ids that aren't just their uppercased name; extend via PRICE_SYMBOLS
+
+const PROVIDERS = {
+  coingecko: {
+    name: 'CoinGecko', url: 'https://www.coingecko.com',
+    async fetch(ids){
+      const url = 'https://api.coingecko.com/api/v3/simple/price?vs_currencies=usd&include_24hr_change=true&ids=' +
+        encodeURIComponent(ids.join(','));
+      const res = await fetch(url, {
+        headers: CG_API_KEY ? {'x-cg-demo-api-key': CG_API_KEY} : undefined,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json(), out = {};
+      ids.forEach(id => {
+        const p = data[id];
+        if (p && typeof p.usd === 'number') out[id] = {usd: p.usd, change: typeof p.usd_24h_change === 'number' ? p.usd_24h_change : null};
+      });
+      return out;
+    }
+  },
+  livecoinwatch: {
+    name: 'LiveCoinWatch', url: 'https://www.livecoinwatch.com',
+    async fetch(ids){
+      const sym = id => (PRICE_SYMBOLS[id] || LCW_DEFAULT_SYMBOLS[id] || id.replace(/-/g, '')).toUpperCase();
+      const res = await fetch('https://api.livecoinwatch.com/coins/map', {
+        method: 'POST',
+        headers: {'content-type': 'application/json', 'x-api-key': LCW_API_KEY},
+        body: JSON.stringify({currency: 'USD', codes: ids.map(sym), sort: 'rank', order: 'ascending', offset: 0, limit: 0, meta: false}),
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json(), out = {};
+      ids.forEach(id => {
+        const p = Array.isArray(data) && data.find(x => x.code === sym(id));
+        if (p && typeof p.rate === 'number') out[id] = {usd: p.rate, change: p.delta && typeof p.delta.day === 'number' ? (p.delta.day - 1) * 100 : null};
+      });
+      return out;
+    }
+  }
+};
+
+/* window.PRICE_PROVIDER ('coingecko' | 'livecoinwatch') wins; otherwise a LiveCoinWatch key selects LiveCoinWatch,
+   and anything else (a CoinGecko key, or no key at all) uses CoinGecko. LiveCoinWatch always needs its key. */
+function pickProvider(){
+  const want = String(window.PRICE_PROVIDER || '').toLowerCase();
+  if (want === 'coingecko') return 'coingecko';
+  if (want === 'livecoinwatch' || !want) return LCW_API_KEY ? 'livecoinwatch' : 'coingecko';
+  return 'coingecko';
+}
+const PROVIDER = PROVIDERS[pickProvider()];
+{
+  const a = document.createElement('a');
+  a.href = PROVIDER.url; a.textContent = PROVIDER.name; a.style.color = 'inherit';
+  $('credit').append('Prices by ', a);
+}
+
 async function loadPrices(){
+  if (document.hidden) return;   // don't spend API calls on a background tab; the visibility handler catches up
   const ids = new Set(['bitcoin']);
   rows.forEach(r => {
     const id = (r.network || '').trim().toLowerCase().replace(/\s+/g, '-');
@@ -247,11 +309,7 @@ async function loadPrices(){
   });
   priceIds = [...ids];
   try{
-    const url = 'https://api.coingecko.com/api/v3/simple/price?vs_currencies=usd&include_24hr_change=true&ids=' +
-      encodeURIComponent(priceIds.join(','));
-    const res = await fetch(url, CG_API_KEY ? {headers:{'x-cg-demo-api-key':CG_API_KEY}} : undefined);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    prices = await res.json();
+    prices = await PROVIDER.fetch(priceIds);
     lastPriceFetch = Date.now();
   } catch (e){ /* keep showing the last prices, if any */ }
   renderPrices();
@@ -262,15 +320,15 @@ function renderPrices(){
   const fmt = n => new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', maximumFractionDigits: n < 1 ? 6 : 2}).format(n);
   priceIds.forEach(id => {
     const p = prices[id];
-    if (!p || typeof p.usd !== 'number') return;   // not listed on CoinGecko: skip
+    if (!p) return;   // not listed by the provider: skip
     const card = document.createElement('div'); card.className = 'price';
     const n = document.createElement('div'); n.className = 'n'; n.textContent = id.charAt(0).toUpperCase() + id.slice(1);
     const v = document.createElement('div'); v.className = 'v'; v.textContent = fmt(p.usd);
     card.append(n, v);
-    if (typeof p.usd_24h_change === 'number'){
+    if (typeof p.change === 'number'){
       const c = document.createElement('div');
-      c.className = 'c ' + (p.usd_24h_change >= 0 ? 'up' : 'down');
-      c.textContent = (p.usd_24h_change >= 0 ? '▲ ' : '▼ ') + Math.abs(p.usd_24h_change).toFixed(2) + '%';
+      c.className = 'c ' + (p.change >= 0 ? 'up' : 'down');
+      c.textContent = (p.change >= 0 ? '▲ ' : '▼ ') + Math.abs(p.change).toFixed(2) + '%';
       card.append(c);
     }
     box.append(card);
