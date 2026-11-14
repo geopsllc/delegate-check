@@ -12,7 +12,7 @@ nano config.py
 - `install.sh` installs the dependencies and creates `config.py` from `config.example.py`
 - change config.py to your liking
 - `config.py` and `web/local.js` are git-ignored, so `git pull` never touches your settings; new options show up in `config.example.py`
-- optional: copy `web/local.example.js` to `web/local.js` to set a CoinGecko API key for the dashboard
+- optional: copy `web/local.example.js` to `web/local.js` to set a CoinGecko or LiveCoinWatch API key for the dashboard (without one, prices come from keyless CoinGecko)
 - test the script in cli mode by running ```python3 delcheck.py```
 
 Frontend setup:
@@ -31,6 +31,12 @@ This is a DPoS Monitoring Tool for Multiple Delegates Across Multiple Networks.
 - You can set `heartbeat_url` in config.py (e.g. a healthchecks.io ping URL) to get alerted when the script itself stops running.
 
 ## Changelog
+### 1.7
+
+- the dashboard's price cards can use CoinGecko (default, works without a key) or LiveCoinWatch (free key, 10,000 requests a day); set `LCW_API_KEY` and/or `CG_API_KEY` in `web/local.js`, or force one with `PRICE_PROVIDER` (see `web/local.example.js`)
+- LiveCoinWatch looks coins up by ticker: the network name uppercased is used by default, and `PRICE_SYMBOLS` in `web/local.js` overrides it for networks where that doesn't match
+- prices are no longer fetched while the tab is hidden, which saves API calls
+
 ### 1.6
 
 - ages ("last block", stale warning, cli output) are shown in minutes, hours or days, e.g. "1 minute ago", "3 hours ago", "2 days ago"
