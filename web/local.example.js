@@ -15,3 +15,7 @@ window.PRICE_PROVIDER = '';
 // is used by default ("ark" -> ARK), and bitcoin is built in. Add a ticker here for any network where that
 // doesn't match, e.g. { monolythium: 'LYTH' }.
 window.PRICE_SYMBOLS = {};
+
+// How often prices refresh, in seconds (minimum 10). Leave empty for the default: 300 (5 minutes) with CoinGecko,
+// 60 with LiveCoinWatch. LiveCoinWatch allows 10,000 requests a day, so 60 seconds uses about 1,440 a day per open tab.
+window.PRICE_REFRESH_SECS = '';
