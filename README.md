@@ -36,6 +36,7 @@ This is a DPoS Monitoring Tool for Multiple Delegates Across Multiple Networks.
 - the dashboard's price cards can use CoinGecko (default, works without a key) or LiveCoinWatch (free key, 10,000 requests a day); set `LCW_API_KEY` and/or `CG_API_KEY` in `web/local.js`, or force one with `PRICE_PROVIDER` (see `web/local.example.js`)
 - LiveCoinWatch looks coins up by ticker: the network name uppercased is used by default, and `PRICE_SYMBOLS` in `web/local.js` overrides it for networks where that doesn't match
 - prices are no longer fetched while the tab is hidden, which saves API calls
+- prices refresh every 5 minutes with CoinGecko and every minute with LiveCoinWatch; `PRICE_REFRESH_SECS` in `web/local.js` overrides it
 
 ### 1.6
 
