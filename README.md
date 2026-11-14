@@ -31,6 +31,11 @@ This is a DPoS Monitoring Tool for Multiple Delegates Across Multiple Networks.
 - You can set `heartbeat_url` in config.py (e.g. a healthchecks.io ping URL) to get alerted when the script itself stops running.
 
 ## Changelog
+### 1.8
+
+- price chips no longer include BTC by default; add BTC or any other coin (name + ticker) with `PRICE_COINS` in `web/local.js`
+- prices are shown with about three significant digits (no decimals from $100 up, 3 for $0.10-1, 4 for $0.01-0.10, ...); a coin's `decimals` in `PRICE_COINS` overrides it
+
 ### 1.7
 
 - the dashboard's price cards can use CoinGecko (default, works without a key) or LiveCoinWatch (free key, 10,000 requests a day); set `LCW_API_KEY` and/or `CG_API_KEY` in `web/local.js`, or force one with `PRICE_PROVIDER` (see `web/local.example.js`)

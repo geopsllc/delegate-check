@@ -107,7 +107,8 @@ const STALE_SECS = 180;          // warn when the backend hasn't written new dat
 const CG_API_KEY  = window.CG_API_KEY  || '';   // CoinGecko Demo key
 const LCW_API_KEY = window.LCW_API_KEY || '';   // LiveCoinWatch key
 const PRICE_SYMBOLS = window.PRICE_SYMBOLS || {}; // LiveCoinWatch ticker overrides, e.g. {monolythium: 'LYTH'}
-let priceIds = [], prices = {}, lastPriceFetch = 0, priceTimer = null;
+const PRICE_COINS = Array.isArray(window.PRICE_COINS) ? window.PRICE_COINS : []; // extra coins, e.g. [{name: 'Bitcoin', ticker: 'BTC'}]
+let priceCoins = [], prices = {}, lastPriceFetch = 0, priceTimer = null;
 const $ = id => document.getElementById(id);
 
 let rows = [], prev = new Map();
@@ -240,14 +241,14 @@ function render(){
   else { const m = document.createElement('div'); m.className = 'msg'; m.textContent = 'No delegates found in ' + STATUS_URL + '.'; $('wrap').append(m); }
 }
 
-/* Prices: BTC plus every distinct network name. Each provider turns a list of ids (lowercased network
-   names, "bitcoin") into {id: {usd, change}}, where change is the 24h change in percent. */
-const LCW_DEFAULT_SYMBOLS = {bitcoin: 'BTC'};   // ids that aren't just their uppercased name; extend via PRICE_SYMBOLS
-
+/* Prices: one chip per distinct network, plus any extra coins from window.PRICE_COINS in web/local.js.
+   A coin is {id, ticker, name, decimals}: id is the CoinGecko id, ticker the LiveCoinWatch code, name the chip label.
+   Each provider turns a list of coins into {id: {usd, change}}, where change is the 24h change in percent. */
 const PROVIDERS = {
   coingecko: {
     name: 'CoinGecko', url: 'https://www.coingecko.com',
-    async fetch(ids){
+    async fetch(coins){
+      const ids = coins.map(c => c.id);
       const url = 'https://api.coingecko.com/api/v3/simple/price?vs_currencies=usd&include_24hr_change=true&ids=' +
         encodeURIComponent(ids.join(','));
       const res = await fetch(url, {
@@ -265,19 +266,18 @@ const PROVIDERS = {
   },
   livecoinwatch: {
     name: 'LiveCoinWatch', url: 'https://www.livecoinwatch.com',
-    async fetch(ids){
-      const sym = id => (PRICE_SYMBOLS[id] || LCW_DEFAULT_SYMBOLS[id] || id.replace(/-/g, '')).toUpperCase();
+    async fetch(coins){
       const res = await fetch('https://api.livecoinwatch.com/coins/map', {
         method: 'POST',
         headers: {'content-type': 'application/json', 'x-api-key': LCW_API_KEY},
-        body: JSON.stringify({currency: 'USD', codes: ids.map(sym), sort: 'rank', order: 'ascending', offset: 0, limit: 0, meta: false}),
+        body: JSON.stringify({currency: 'USD', codes: coins.map(c => c.ticker), sort: 'rank', order: 'ascending', offset: 0, limit: 0, meta: false}),
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json(), out = {};
-      ids.forEach(id => {
-        const p = Array.isArray(data) && data.find(x => x.code === sym(id));
-        if (p && typeof p.rate === 'number') out[id] = {usd: p.rate, change: p.delta && typeof p.delta.day === 'number' ? (p.delta.day - 1) * 100 : null};
+      coins.forEach(c => {
+        const p = Array.isArray(data) && data.find(x => x.code === c.ticker);
+        if (p && typeof p.rate === 'number') out[c.id] = {usd: p.rate, change: p.delta && typeof p.delta.day === 'number' ? (p.delta.day - 1) * 100 : null};
       });
       return out;
     }
@@ -305,24 +305,40 @@ const PRICE_REFRESH_MS = Math.max(10, +window.PRICE_REFRESH_SECS || (PROVIDER_ID
 /* Keep the last prices in the browser so the chips show immediately on page load (and while a slow API call is
    still running); they're replaced as soon as fresh prices arrive. Cached prices older than 30 minutes are ignored. */
 const CACHE_KEY = 'delegate-prices:' + PROVIDER_ID, CACHE_MAX_AGE_MS = 1800000;
-function saveCache(){ try{ localStorage.setItem(CACHE_KEY, JSON.stringify({t: Date.now(), prices})); } catch (e){} }
+function saveCache(){ try{ localStorage.setItem(CACHE_KEY, JSON.stringify({t: Date.now(), coins: priceCoins, prices})); } catch (e){} }
 (function showCached(){
   try{
     const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-    if (c && c.prices && Date.now() - c.t < CACHE_MAX_AGE_MS){ prices = c.prices; priceIds = Object.keys(prices); renderPrices(); }
+    if (c && Array.isArray(c.coins) && c.prices && Date.now() - c.t < CACHE_MAX_AGE_MS){ priceCoins = c.coins; prices = c.prices; renderPrices(); }
   } catch (e){}
 })();
 
-async function loadPrices(retry){
-  if (document.hidden) return;   // don't spend API calls on a background tab; the visibility handler catches up
-  const ids = new Set(['bitcoin']);
+/* Custom coins first, in the order listed in local.js, then each network not already covered. A network's
+   CoinGecko id is its lowercased name; its ticker is PRICE_SYMBOLS[id] or the uppercased name. */
+function coinList(){
+  const list = [], seen = new Set();
+  const add = c => { if (c.id && !seen.has(c.id)){ seen.add(c.id); list.push(c); } };
+  PRICE_COINS.forEach(c => {
+    if (!c || !c.name) return;
+    const id = String(c.id || c.name).trim().toLowerCase().replace(/\s+/g, '-');
+    add({id, name: String(c.name), ticker: String(c.ticker || PRICE_SYMBOLS[id] || id.replace(/-/g, '')).toUpperCase(),
+         decimals: Number.isInteger(c.decimals) ? c.decimals : null});
+  });
   rows.forEach(r => {
     const id = (r.network || '').trim().toLowerCase().replace(/\s+/g, '-');
-    if (id) ids.add(id);
+    if (id) add({id, name: id.charAt(0).toUpperCase() + id.slice(1),
+                 ticker: String(PRICE_SYMBOLS[id] || id.replace(/-/g, '')).toUpperCase(), decimals: null});
   });
-  priceIds = [...ids];
+  return list;
+}
+
+async function loadPrices(retry){
+  if (document.hidden) return;   // don't spend API calls on a background tab; the visibility handler catches up
+  const coins = coinList();
+  if (!coins.length) return;
   try{
-    prices = await PROVIDER.fetch(priceIds);
+    prices = await PROVIDER.fetch(coins);
+    priceCoins = coins;
     lastPriceFetch = Date.now();
     saveCache();
   } catch (e){   /* keep showing the last prices, if any, and try once more shortly */
@@ -331,15 +347,27 @@ async function loadPrices(retry){
   renderPrices();
 }
 
+/* Show about three significant digits, never more than needed: $100 and up gets no decimals (BTC, ETH),
+   $10-100 one, $1-10 two, $0.10-1 three (ARK), $0.01-0.10 four (POLYX), and so on (capped at 8).
+   A coin's own "decimals" in PRICE_COINS overrides this. */
+function priceDecimals(n){
+  if (!(n > 0)) return 2;
+  return Math.min(8, Math.max(0, 2 - Math.floor(Math.log10(n))));
+}
+function fmtPrice(n, decimals){
+  const d = decimals == null ? priceDecimals(n) : decimals;
+  return new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', minimumFractionDigits: d, maximumFractionDigits: d}).format(n);
+}
+
 function renderPrices(){
   const box = $('prices'); box.innerHTML = '';
-  const fmt = n => new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', maximumFractionDigits: n < 1 ? 6 : 2}).format(n);
-  priceIds.forEach(id => {
-    const p = prices[id];
+  priceCoins.forEach(coin => {
+    const p = prices[coin.id];
     if (!p) return;   // not listed by the provider: skip
     const card = document.createElement('div'); card.className = 'price';
-    const n = document.createElement('div'); n.className = 'n'; n.textContent = id.charAt(0).toUpperCase() + id.slice(1);
-    const v = document.createElement('div'); v.className = 'v'; v.textContent = fmt(p.usd);
+    const n = document.createElement('div'); n.className = 'n'; n.textContent = coin.name;
+    n.title = coin.ticker;
+    const v = document.createElement('div'); v.className = 'v'; v.textContent = fmtPrice(p.usd, coin.decimals);
     card.append(n, v);
     if (typeof p.change === 'number'){
       const c = document.createElement('div');

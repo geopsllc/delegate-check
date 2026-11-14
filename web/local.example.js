@@ -11,9 +11,19 @@ window.LCW_API_KEY = '';  // free LiveCoinWatch key (optional): 10,000 requests 
 // a LiveCoinWatch key selects LiveCoinWatch, otherwise CoinGecko (with your key if set, keyless if not).
 window.PRICE_PROVIDER = '';
 
-// LiveCoinWatch looks coins up by ticker, not by CoinGecko id. The network name from status.json, uppercased,
-// is used by default ("ark" -> ARK), and bitcoin is built in. Add a ticker here for any network where that
-// doesn't match, e.g. { monolythium: 'LYTH' }.
+// A price chip is shown for every network in status.json. Add any other coins here, in the order you want them
+// (they appear before the network chips). name is the chip label, ticker the symbol LiveCoinWatch uses.
+// CoinGecko looks coins up by id, which defaults to the name lowercased with dashes ("Bitcoin" -> bitcoin);
+// add id when that doesn't match. Prices get about three significant digits ($97,412 / $3,105 / $0.284 / $0.0712);
+// set decimals to force a fixed number for a coin.
+window.PRICE_COINS = [
+  // {name: 'Bitcoin',  ticker: 'BTC'},
+  // {name: 'Ethereum', ticker: 'ETH', decimals: 1},
+  // {name: 'Polymesh', ticker: 'POLYX'},
+];
+
+// LiveCoinWatch tickers for networks: the network name from status.json, uppercased, is used by default
+// ("ark" -> ARK). Add a ticker here for any network where that doesn't match, e.g. { monolythium: 'LYTH' }.
 window.PRICE_SYMBOLS = {};
 
 // How often prices refresh, in seconds (minimum 10). Leave empty for the default: 300 (5 minutes) with CoinGecko,
