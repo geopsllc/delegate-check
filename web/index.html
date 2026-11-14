@@ -302,7 +302,18 @@ const PRICE_REFRESH_MS = Math.max(10, +window.PRICE_REFRESH_SECS || (PROVIDER_ID
   $('credit').append('Prices by ', a);
 }
 
-async function loadPrices(){
+/* Keep the last prices in the browser so the chips show immediately on page load (and while a slow API call is
+   still running); they're replaced as soon as fresh prices arrive. Cached prices older than 30 minutes are ignored. */
+const CACHE_KEY = 'delegate-prices:' + PROVIDER_ID, CACHE_MAX_AGE_MS = 1800000;
+function saveCache(){ try{ localStorage.setItem(CACHE_KEY, JSON.stringify({t: Date.now(), prices})); } catch (e){} }
+(function showCached(){
+  try{
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+    if (c && c.prices && Date.now() - c.t < CACHE_MAX_AGE_MS){ prices = c.prices; priceIds = Object.keys(prices); renderPrices(); }
+  } catch (e){}
+})();
+
+async function loadPrices(retry){
   if (document.hidden) return;   // don't spend API calls on a background tab; the visibility handler catches up
   const ids = new Set(['bitcoin']);
   rows.forEach(r => {
@@ -313,7 +324,10 @@ async function loadPrices(){
   try{
     prices = await PROVIDER.fetch(priceIds);
     lastPriceFetch = Date.now();
-  } catch (e){ /* keep showing the last prices, if any */ }
+    saveCache();
+  } catch (e){   /* keep showing the last prices, if any, and try once more shortly */
+    if (retry !== true) setTimeout(() => loadPrices(true), 3000);
+  }
   renderPrices();
 }
 
